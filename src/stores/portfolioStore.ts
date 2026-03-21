@@ -64,6 +64,13 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
       supabase.from('snapshots').select('date, total_value').eq('user_id', userId).order('date'),
     ]);
 
+    // Surface RLS / permission errors so they're visible in the console
+    if (accountsRes.error) console.error('[Portfolio] accounts fetch error:', accountsRes.error.message, '| code:', accountsRes.error.code);
+    if (positionsRes.error) console.error('[Portfolio] positions fetch error:', positionsRes.error.message, '| code:', positionsRes.error.code);
+    if (watchlistRes.error) console.error('[Portfolio] watchlist fetch error:', watchlistRes.error.message);
+    if (allocationsRes.error) console.error('[Portfolio] allocations fetch error:', allocationsRes.error.message);
+    if (snapshotsRes.error) console.error('[Portfolio] snapshots fetch error:', snapshotsRes.error.message);
+
     const accounts: BrokerAccount[] = (accountsRes.data ?? []).map((r) => ({
       id: r.id,
       name: r.name,

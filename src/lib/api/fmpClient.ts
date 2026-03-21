@@ -49,19 +49,38 @@ async function fetchFromStable<T>(endpoint: string): Promise<T> {
     throw new Error(`FMP API error: ${response.status} ${response.statusText}`);
   }
 
-  const data = await response.json();
+  // FMP sometimes returns plain-text errors with status 200 (e.g. "Premium Query Parameter")
+  const text = await response.text();
+  if (text.startsWith('Premium') || text.startsWith('Limit') || text.startsWith('Special')) {
+    throw new Error(`FMP API error: ${text.slice(0, 120)}`);
+  }
 
-  // Check for error message in response body (FMP returns 200 with error message)
+  const data = JSON.parse(text) as unknown;
+
+  // Also handle JSON-wrapped error messages
   if (
     data &&
     typeof data === 'object' &&
-    'Error Message' in data &&
-    typeof data['Error Message'] === 'string'
+    'Error Message' in (data as object) &&
+    typeof (data as Record<string, unknown>)['Error Message'] === 'string'
   ) {
-    throw new Error(`FMP API error: ${data['Error Message']}`);
+    throw new Error(`FMP API error: ${(data as Record<string, unknown>)['Error Message']}`);
   }
 
   return data as T;
+}
+
+// ─── Symbol normalization ─────────────────────────────────────────────────────
+// FMP free tier blocks certain symbol variants — remap to accepted equivalents.
+// The quote result's .symbol field is rewritten back to the original so the rest
+// of the app sees the symbol the user actually holds (e.g. GOOG, not GOOGL).
+const FMP_SYMBOL_MAP: Record<string, string> = {
+  GOOG:    'GOOGL',   // Alphabet class C → class A (same underlying company)
+  'BRK.B': 'BRK-B',
+  'BRK.A': 'BRK-A',
+};
+function normalizeFmpSymbol(s: string): string {
+  return FMP_SYMBOL_MAP[s.toUpperCase()] ?? s.toUpperCase();
 }
 
 // ─── Quotes ───────────────────────────────────────────────────────────────────
@@ -109,14 +128,18 @@ export async function fetchQuotes(symbols: string[]): Promise<StockQuote[]> {
   if (symbols.length === 0) return [];
 
   try {
-    // Stable API requires individual requests per symbol
     const results = await Promise.all(
-      symbols.map(async (symbol) => {
+      symbols.map(async (originalSymbol) => {
+        const fmpSymbol = normalizeFmpSymbol(originalSymbol);
         try {
-          const data = await fetchFromStable<StableQuote[]>(`/quote?symbol=${symbol}`);
-          return data?.[0] ? mapStableQuote(data[0]) : null;
+          const data = await fetchFromStable<StableQuote[]>(`/quote?symbol=${fmpSymbol}`);
+          if (!data?.[0]) return null;
+          const quote = mapStableQuote(data[0]);
+          // Restore original symbol so positions keyed on e.g. GOOG still match
+          quote.symbol = originalSymbol.toUpperCase();
+          return quote;
         } catch {
-          console.error(`[FMP Client] Error fetching quote for ${symbol}`);
+          console.error(`[FMP Client] Quote unavailable for ${originalSymbol}`);
           return null;
         }
       })

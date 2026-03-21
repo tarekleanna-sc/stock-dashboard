@@ -10,10 +10,10 @@ export default function PortfolioSummary() {
   const { accounts } = usePortfolioStore();
 
   const totalGainLoss = totalValue - totalCostBasis;
-  const totalGainLossPercent = totalCostBasis > 0 ? totalGainLoss / totalCostBasis : 0;
+  const totalGainLossPercent = totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
   const isGainPositive = totalGainLoss >= 0;
   const isDayPositive = totalDayChange >= 0;
-  const dayChangePercent = totalValue > 0 ? totalDayChange / (totalValue - totalDayChange) : 0;
+  const dayChangePercent = totalValue > 0 ? (totalDayChange / (totalValue - totalDayChange)) * 100 : 0;
 
   const metrics = [
     {
@@ -31,13 +31,13 @@ export default function PortfolioSummary() {
     {
       label: 'Total Gain/Loss',
       value: `${isGainPositive ? '+' : ''}${formatCurrency(totalGainLoss)}`,
-      subValue: `${isGainPositive ? '+' : ''}${formatPercent(totalGainLossPercent)}`,
+      subValue: formatPercent(totalGainLossPercent),
       color: isGainPositive ? 'text-emerald-400' : 'text-rose-400',
     },
     {
       label: 'Day Change',
       value: `${isDayPositive ? '+' : ''}${formatCurrency(totalDayChange)}`,
-      subValue: `${isDayPositive ? '+' : ''}${formatPercent(dayChangePercent)}`,
+      subValue: formatPercent(dayChangePercent),
       color: isDayPositive ? 'text-emerald-400' : 'text-rose-400',
     },
     {

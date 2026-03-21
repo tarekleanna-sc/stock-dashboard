@@ -11,11 +11,9 @@ interface PositionRowProps {
 }
 
 export default function PositionRow({ position, onEdit, onDelete }: PositionRowProps) {
-  const gainLoss = (position.marketValue ?? 0) - position.shares * position.costBasisPerShare;
-  const gainLossPercent =
-    position.costBasisPerShare > 0
-      ? gainLoss / (position.shares * position.costBasisPerShare)
-      : 0;
+  // Use pre-calculated values from enrichPosition (already has * 100 applied)
+  const gainLoss = position.gainLoss ?? 0;
+  const gainLossPercent = position.gainLossPercent ?? 0;
   const isPositive = gainLoss >= 0;
   const dayChangePercent = position.dayChangePercent ?? 0;
   const isDayPositive = dayChangePercent >= 0;
@@ -58,14 +56,14 @@ export default function PositionRow({ position, onEdit, onDelete }: PositionRowP
           {isPositive ? '+' : ''}{formatCurrency(gainLoss)}
         </p>
         <p className={`text-xs ${isPositive ? 'text-emerald-400/70' : 'text-rose-400/70'}`}>
-          {isPositive ? '+' : ''}{formatPercent(gainLossPercent)}
+          {formatPercent(gainLossPercent)}
         </p>
       </div>
 
       {/* Day Change */}
       <div className="w-[70px] min-w-[70px] text-right">
         <p className={`text-sm font-medium ${isDayPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-          {isDayPositive ? '+' : ''}{formatPercent(dayChangePercent)}
+          {formatPercent(dayChangePercent)}
         </p>
       </div>
 

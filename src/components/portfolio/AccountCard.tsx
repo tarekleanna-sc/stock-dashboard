@@ -17,7 +17,7 @@ export default function AccountCard({ account, positions, onEdit, onDelete }: Ac
   const totalMarketValue = positions.reduce((sum, p) => sum + (p.marketValue ?? 0), 0);
   const totalCostBasis = positions.reduce((sum, p) => sum + p.shares * p.costBasisPerShare, 0);
   const totalGainLoss = totalMarketValue - totalCostBasis;
-  const totalGainLossPercent = totalCostBasis > 0 ? totalGainLoss / totalCostBasis : 0;
+  const totalGainLossPercent = totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
   const isPositive = totalGainLoss >= 0;
 
   return (
@@ -51,7 +51,7 @@ export default function AccountCard({ account, positions, onEdit, onDelete }: Ac
           <p className="text-xs text-white/50 uppercase tracking-wider">Gain/Loss</p>
           <p className={`text-lg font-semibold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
             {isPositive ? '+' : ''}{formatCurrency(totalGainLoss)}{' '}
-            <span className="text-sm">({isPositive ? '+' : ''}{formatPercent(totalGainLossPercent)})</span>
+            <span className="text-sm">({formatPercent(totalGainLossPercent)})</span>
           </p>
         </div>
         <div>
