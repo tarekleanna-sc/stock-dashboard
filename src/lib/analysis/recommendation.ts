@@ -308,14 +308,18 @@ export function scoreStock(input: StockAnalysisInput): BuyRecommendation {
     income.score +
     momentum.score;
 
-  // Calculate intrinsic value via DCF if we have cash flow data
+  // Multi-factor valuation approach
   let intrinsicValue: number;
   const currentPrice = quote.price ?? 0;
   const latestCF = cashFlowStatements[0];
   const latestMetrics = keyMetrics[0];
+  const latestIncomeStatement = incomeStatements[0];
 
+  // Calculate intrinsic value from multiple approaches
+  const valuationEstimates: number[] = [];
+
+  // 1. DCF approach based on FCF
   if (latestCF && latestCF.freeCashFlow && latestCF.freeCashFlow > 0) {
-    // Estimate growth rate from revenue growth
     let estGrowthRate = 0.08;
     if (incomeStatements.length >= 2) {
       const current = incomeStatements[0]?.revenue ?? 0;
@@ -329,7 +333,7 @@ export function scoreStock(input: StockAnalysisInput): BuyRecommendation {
       (quote.marketCap && currentPrice > 0 ? quote.marketCap / currentPrice : 0);
 
     if (sharesOutstanding > 0) {
-      intrinsicValue = calculateIntrinsicValue(
+      const dcfValue = calculateIntrinsicValue(
         latestCF.freeCashFlow,
         estGrowthRate,
         0.10,
@@ -337,9 +341,89 @@ export function scoreStock(input: StockAnalysisInput): BuyRecommendation {
         5,
         sharesOutstanding
       );
-    } else {
-      intrinsicValue = currentPrice * 1.2;
+      valuationEstimates.push(dcfValue);
     }
+  }
+
+  // 2. Forward P/E approach (adjusted for growth and quality)
+  if (latestMetrics && latestMetrics.peRatio && latestMetrics.peRatio > 0) {
+    const baseEarnings = currentPrice / latestMetrics.peRatio;
+
+    // Calculate revenue growth rate for quality adjustment
+    let revenueGrowthRate = 0.05;
+    if (incomeStatements.length >= 2 && (incomeStatements[1]?.revenue ?? 0) > 0) {
+      revenueGrowthRate = ((incomeStatements[0]?.revenue ?? 0) - (incomeStatements[1]?.revenue ?? 0)) / (incomeStatements[1]?.revenue ?? 1);
+    }
+
+    // Quality multiplier: higher growth + better margins = higher justified multiple
+    const profitMargin = (latestMetrics.netProfitMargin ?? 0);
+    const roe = (latestMetrics.returnOnEquity ?? 0);
+
+    // Justified forward P/E: PEG-like approach adjusted for quality
+    // Base: 15x for average company, scale with growth and quality
+    let justifiedMultiple = 15;
+    if (revenueGrowthRate > 0.15) justifiedMultiple = 22;
+    else if (revenueGrowthRate > 0.10) justifiedMultiple = 20;
+    else if (revenueGrowthRate > 0.05) justifiedMultiple = 17;
+
+    // Quality adjustments (margin and ROE)
+    if (profitMargin > 0.20) justifiedMultiple += 2;
+    else if (profitMargin > 0.10) justifiedMultiple += 1;
+
+    if (roe > 0.20) justifiedMultiple += 2;
+    else if (roe > 0.15) justifiedMultiple += 1;
+
+    const forwardEarnings = baseEarnings * (1 + Math.max(0.02, Math.min(0.2, revenueGrowthRate)));
+    const peValue = forwardEarnings * justifiedMultiple;
+    valuationEstimates.push(peValue);
+  }
+
+  // 3. FCF Yield approach: target 5-8% FCF yield for quality companies
+  if (latestCF && latestCF.freeCashFlow && latestCF.freeCashFlow > 0) {
+    const sharesOutstanding = quote.sharesOutstanding ??
+      (quote.marketCap && currentPrice > 0 ? quote.marketCap / currentPrice : 0);
+
+    if (sharesOutstanding > 0) {
+      const fcfPerShare = latestCF.freeCashFlow / sharesOutstanding;
+      // Target yield: 6% for quality companies, adjusted by growth
+      let revenueGrowthRate = 0.05;
+      if (incomeStatements.length >= 2 && (incomeStatements[1]?.revenue ?? 0) > 0) {
+        revenueGrowthRate = ((incomeStatements[0]?.revenue ?? 0) - (incomeStatements[1]?.revenue ?? 0)) / (incomeStatements[1]?.revenue ?? 1);
+      }
+      const targetYield = 0.06 - (revenueGrowthRate * 0.05); // Lower yield for higher growth
+      const fcfValue = fcfPerShare / Math.max(0.02, targetYield);
+      valuationEstimates.push(fcfValue);
+    }
+  }
+
+  // 4. Revenue multiple approach for high-growth or unprofitable companies
+  if (latestIncomeStatement && latestIncomeStatement.revenue && latestIncomeStatement.revenue > 0) {
+    const sharesOutstanding = quote.marketCap && currentPrice > 0 ? quote.marketCap / currentPrice : 0;
+    if (sharesOutstanding > 0) {
+      const revenuePerShare = latestIncomeStatement.revenue / sharesOutstanding;
+      const profitMargin = (latestMetrics?.netProfitMargin ?? 0.10);
+
+      // Calculate revenue growth rate
+      let revenueGrowthRate = 0.05;
+      if (incomeStatements.length >= 2 && (incomeStatements[1]?.revenue ?? 0) > 0) {
+        revenueGrowthRate = ((incomeStatements[0]?.revenue ?? 0) - (incomeStatements[1]?.revenue ?? 0)) / (incomeStatements[1]?.revenue ?? 1);
+      }
+
+      // Revenue multiple: 2x for slow growth, up to 8x for high-growth + margin
+      let revenueMultiple = 2;
+      if (revenueGrowthRate > 0.15 && profitMargin > 0.10) revenueMultiple = 6;
+      else if (revenueGrowthRate > 0.10 && profitMargin > 0.05) revenueMultiple = 4;
+      else if (revenueGrowthRate > 0.05) revenueMultiple = 3;
+
+      const revValue = revenuePerShare * revenueMultiple;
+      valuationEstimates.push(revValue);
+    }
+  }
+
+  // Use median of available estimates for robustness
+  if (valuationEstimates.length > 0) {
+    valuationEstimates.sort((a, b) => a - b);
+    intrinsicValue = valuationEstimates[Math.floor(valuationEstimates.length / 2)];
   } else {
     intrinsicValue = currentPrice * 1.2;
   }

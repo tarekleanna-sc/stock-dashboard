@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { LogOut } from 'lucide-react';
+import { useSupabase } from '@/providers/SupabaseProvider';
 
 const navItems = [
   {
@@ -68,8 +70,10 @@ const navItems = [
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ userEmail }: { userEmail: string }) {
   const pathname = usePathname();
+  const { supabase } = useSupabase();
+  const initials = userEmail ? userEmail[0].toUpperCase() : '?';
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-16 flex-col items-center border-r border-white/[0.08] bg-white/[0.05] py-6 backdrop-blur-xl">
@@ -109,6 +113,26 @@ export default function Sidebar() {
           );
         })}
       </nav>
+
+      {/* User avatar + logout */}
+      <div className="flex flex-col items-center gap-3">
+        <div
+          title={userEmail}
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500/20 text-xs font-semibold text-cyan-400 ring-1 ring-cyan-500/30"
+        >
+          {initials}
+        </div>
+        <button
+          onClick={() => supabase.auth.signOut()}
+          title="Sign out"
+          className="group relative flex h-8 w-8 items-center justify-center rounded-xl text-white/30 transition-all hover:bg-white/[0.06] hover:text-rose-400"
+        >
+          <LogOut size={14} />
+          <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white/90 opacity-0 shadow-lg backdrop-blur-xl transition-opacity duration-200 group-hover:opacity-100">
+            Sign out
+          </span>
+        </button>
+      </div>
     </aside>
   );
 }

@@ -15,33 +15,37 @@ import RebalanceSuggestionList from '@/components/rebalance/RebalanceSuggestionL
 import { calculateRebalanceSuggestions } from '@/lib/analysis/rebalance';
 import { usePortfolioValue } from '@/hooks/usePortfolioValue';
 import { usePortfolioStore } from '@/stores/portfolioStore';
+import { useSupabase } from '@/providers/SupabaseProvider';
 import { formatPercent } from '@/lib/utils/formatting';
 import { CHART_COLORS } from '@/lib/utils/constants';
 
 export default function RebalancePage() {
+  const { supabase, user } = useSupabase();
   const { enrichedPositions, totalValue, isLoading } = usePortfolioValue();
   const { targetAllocations, setTargetAllocation } = usePortfolioStore();
 
   const handleChange = useCallback(
     (ticker: string, value: number) => {
-      setTargetAllocation(ticker, value);
+      if (!user) return;
+      setTargetAllocation(ticker, value, supabase, user.id);
     },
-    [setTargetAllocation]
+    [setTargetAllocation, supabase, user]
   );
 
   const handleEqualWeight = useCallback(() => {
-    if (enrichedPositions.length === 0) return;
+    if (enrichedPositions.length === 0 || !user) return;
     const weight = parseFloat((100 / enrichedPositions.length).toFixed(1));
     enrichedPositions.forEach((p) => {
-      setTargetAllocation(p.ticker, weight);
+      setTargetAllocation(p.ticker, weight, supabase, user.id);
     });
-  }, [enrichedPositions, setTargetAllocation]);
+  }, [enrichedPositions, setTargetAllocation, supabase, user]);
 
   const handleClear = useCallback(() => {
+    if (!user) return;
     enrichedPositions.forEach((p) => {
-      setTargetAllocation(p.ticker, 0);
+      setTargetAllocation(p.ticker, 0, supabase, user.id);
     });
-  }, [enrichedPositions, setTargetAllocation]);
+  }, [enrichedPositions, setTargetAllocation, supabase, user]);
 
   const suggestions = useMemo(
     () =>

@@ -9,6 +9,7 @@ import { WeeklyBuyList } from '@/components/recommendations/WeeklyBuyList';
 import { TickerSearch } from '@/components/ui/TickerSearch';
 import { useRecommendations } from '@/hooks/useRecommendations';
 import { usePortfolioStore } from '@/stores/portfolioStore';
+import { useSupabase } from '@/providers/SupabaseProvider';
 
 function SkeletonCard() {
   return (
@@ -33,6 +34,7 @@ function SkeletonCard() {
 }
 
 export default function RecommendationsPage() {
+  const { supabase, user } = useSupabase();
   const [newTicker, setNewTicker] = useState('');
   const { watchlist, addToWatchlist, removeFromWatchlist, getUniqueTickers } =
     usePortfolioStore();
@@ -43,17 +45,19 @@ export default function RecommendationsPage() {
     useRecommendations(watchlistTickers, existingTickers);
 
   const handleAddTicker = () => {
+    if (!user) return;
     const ticker = newTicker.trim().toUpperCase();
     if (ticker && !watchlistTickers.includes(ticker)) {
-      addToWatchlist(ticker);
+      addToWatchlist(ticker, supabase, user.id);
       setNewTicker('');
     }
   };
 
   const handleTickerSelect = (result: { symbol: string }) => {
+    if (!user) return;
     const ticker = result.symbol.toUpperCase();
     if (ticker && !watchlistTickers.includes(ticker)) {
-      addToWatchlist(ticker);
+      addToWatchlist(ticker, supabase, user.id);
     }
     setNewTicker('');
   };
@@ -87,7 +91,7 @@ export default function RecommendationsPage() {
               key={ticker}
               variant="default"
               className="cursor-pointer hover:bg-white/20 transition-colors"
-              onClick={() => removeFromWatchlist(ticker)}
+              onClick={() => user && removeFromWatchlist(ticker, supabase, user.id)}
             >
               {ticker} &times;
             </GlassBadge>

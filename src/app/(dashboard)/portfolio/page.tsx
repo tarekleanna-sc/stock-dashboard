@@ -15,10 +15,12 @@ import { GlassInput } from '@/components/ui/GlassInput';
 import { GlassSelect } from '@/components/ui/GlassSelect';
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { usePortfolioValue } from '@/hooks/usePortfolioValue';
+import { useSupabase } from '@/providers/SupabaseProvider';
 import { accountSchema, AccountFormData, PositionFormData } from '@/lib/validators/schemas';
 import { BrokerAccount, Position, BROKER_LABELS, ACCOUNT_TYPE_LABELS } from '@/types/portfolio';
 
 export default function PortfolioPage() {
+  const { supabase, user } = useSupabase();
   const {
     accounts,
     addAccount,
@@ -88,11 +90,12 @@ export default function PortfolioPage() {
     setIsAccountModalOpen(true);
   };
 
-  const handleAccountSubmit = (data: AccountFormData) => {
+  const handleAccountSubmit = async (data: AccountFormData) => {
+    if (!user) return;
     if (editingAccount) {
-      updateAccount(editingAccount.id, data);
+      await updateAccount(editingAccount.id, data, supabase);
     } else {
-      addAccount(data);
+      await addAccount(data, supabase, user.id);
     }
     setIsAccountModalOpen(false);
     setEditingAccount(null);
@@ -104,9 +107,9 @@ export default function PortfolioPage() {
     setIsDeleteAccountModalOpen(true);
   };
 
-  const handleConfirmDeleteAccount = () => {
+  const handleConfirmDeleteAccount = async () => {
     if (deletingAccount) {
-      deleteAccount(deletingAccount.id);
+      await deleteAccount(deletingAccount.id, supabase);
     }
     setIsDeleteAccountModalOpen(false);
     setDeletingAccount(null);
@@ -125,11 +128,12 @@ export default function PortfolioPage() {
     setIsPositionModalOpen(true);
   };
 
-  const handlePositionSubmit = (data: PositionFormData) => {
+  const handlePositionSubmit = async (data: PositionFormData) => {
+    if (!user) return;
     if (editingPosition) {
-      updatePosition(editingPosition.id, data);
+      await updatePosition(editingPosition.id, data, supabase);
     } else {
-      addPosition(data);
+      await addPosition(data, supabase, user.id);
     }
     setIsPositionModalOpen(false);
     setEditingPosition(null);
@@ -140,9 +144,9 @@ export default function PortfolioPage() {
     setIsDeletePositionModalOpen(true);
   };
 
-  const handleConfirmDeletePosition = () => {
+  const handleConfirmDeletePosition = async () => {
     if (deletingPosition) {
-      deletePosition(deletingPosition.id);
+      await deletePosition(deletingPosition.id, supabase);
     }
     setIsDeletePositionModalOpen(false);
     setDeletingPosition(null);
