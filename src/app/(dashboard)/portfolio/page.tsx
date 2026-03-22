@@ -15,6 +15,7 @@ import { GlassInput } from '@/components/ui/GlassInput';
 import { GlassSelect } from '@/components/ui/GlassSelect';
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { usePortfolioValue } from '@/hooks/usePortfolioValue';
+import { useStockLogos } from '@/hooks/useStockLogos';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { accountSchema, AccountFormData, PositionFormData } from '@/lib/validators/schemas';
 import { BrokerAccount, Position, BROKER_LABELS, ACCOUNT_TYPE_LABELS } from '@/types/portfolio';
@@ -33,6 +34,11 @@ export default function PortfolioPage() {
   } = usePortfolioStore();
 
   const { enrichedPositions } = usePortfolioValue();
+  const allTickers = useMemo(
+    () => Array.from(new Set(enrichedPositions.map((p) => p.ticker))),
+    [enrichedPositions]
+  );
+  const logos = useStockLogos(allTickers);
 
   // Modal states
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -130,13 +136,16 @@ export default function PortfolioPage() {
 
   const handlePositionSubmit = async (data: PositionFormData) => {
     if (!user) return;
-    if (editingPosition) {
-      await updatePosition(editingPosition.id, data, supabase);
-    } else {
-      await addPosition(data, supabase, user.id);
+    try {
+      if (editingPosition) {
+        await updatePosition(editingPosition.id, data, supabase);
+      } else {
+        await addPosition(data, supabase, user.id);
+      }
+    } finally {
+      setIsPositionModalOpen(false);
+      setEditingPosition(null);
     }
-    setIsPositionModalOpen(false);
-    setEditingPosition(null);
   };
 
   const handleOpenDeletePosition = (position: Position) => {
@@ -199,7 +208,9 @@ export default function PortfolioPage() {
       ) : (
         <div className="space-y-6">
           {accounts.map((account) => {
-            const accountPositions = positionsByAccount.get(account.id) ?? [];
+            const accountPositions = [...(positionsByAccount.get(account.id) ?? [])].sort(
+              (a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0)
+            );
             return (
               <div key={account.id} className="space-y-2">
                 <AccountCard
@@ -229,6 +240,7 @@ export default function PortfolioPage() {
                           position={position}
                           onEdit={handleOpenEditPosition}
                           onDelete={handleOpenDeletePosition}
+                          logoUrl={logos[position.ticker]}
                         />
                       ))}
                     </div>

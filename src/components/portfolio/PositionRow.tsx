@@ -3,14 +3,16 @@
 import { PositionWithMarketData } from '@/types/portfolio';
 import { formatCurrency, formatPercent, formatShares } from '@/lib/utils/formatting';
 import { GlassButton } from '@/components/ui/GlassButton';
+import { StockLogo } from '@/components/ui/StockLogo';
 
 interface PositionRowProps {
   position: PositionWithMarketData;
   onEdit: (position: PositionWithMarketData) => void;
   onDelete: (position: PositionWithMarketData) => void;
+  logoUrl?: string;
 }
 
-export default function PositionRow({ position, onEdit, onDelete }: PositionRowProps) {
+export default function PositionRow({ position, onEdit, onDelete, logoUrl }: PositionRowProps) {
   // Use pre-calculated values from enrichPosition (already has * 100 applied)
   const gainLoss = position.gainLoss ?? 0;
   const gainLossPercent = position.gainLossPercent ?? 0;
@@ -21,9 +23,12 @@ export default function PositionRow({ position, onEdit, onDelete }: PositionRowP
   return (
     <div className="flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-white/[0.03] transition-colors min-w-[860px]">
       {/* Ticker & Name */}
-      <div className="w-[130px] min-w-[130px]">
-        <p className="text-white font-bold text-sm">{position.ticker}</p>
-        <p className="text-white/50 text-xs truncate">{position.companyName ?? '--'}</p>
+      <div className="w-[130px] min-w-[130px] flex items-center gap-2.5">
+        <StockLogo ticker={position.ticker} logoUrl={logoUrl} size={32} />
+        <div className="min-w-0">
+          <p className="text-white font-bold text-sm">{position.ticker}</p>
+          <p className="text-white/50 text-xs truncate">{position.companyName ?? '--'}</p>
+        </div>
       </div>
 
       {/* Shares */}

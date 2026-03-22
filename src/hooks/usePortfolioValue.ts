@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useStockQuotes } from '@/hooks/useStockQuote';
+import { useStockProfiles } from '@/hooks/useStockProfiles';
 import { enrichPosition } from '@/lib/utils/calculations';
 import type { PositionWithMarketData } from '@/types/portfolio';
 import type { StockQuote } from '@/types/market';
@@ -16,6 +17,7 @@ export function usePortfolioValue() {
   }, [positions]);
 
   const { data: quotes = [], isLoading, error } = useStockQuotes(uniqueTickers);
+  const profileMap = useStockProfiles(uniqueTickers);
 
   const quoteMap = useMemo(() => {
     const map = new Map<string, StockQuote>();
@@ -28,9 +30,10 @@ export function usePortfolioValue() {
   const enrichedPositions: PositionWithMarketData[] = useMemo(() => {
     return positions.map((position) => {
       const quote = quoteMap.get(position.ticker);
-      return enrichPosition(position, quote);
+      const profile = profileMap[position.ticker];
+      return enrichPosition(position, quote, profile);
     });
-  }, [positions, quoteMap]);
+  }, [positions, quoteMap, profileMap]);
 
   const totalValue = useMemo(
     () => enrichedPositions.reduce((sum, p) => sum + (p.marketValue ?? 0), 0),

@@ -2,76 +2,83 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import PageHeader from '@/components/layout/PageHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { GlassBadge } from '@/components/ui/GlassBadge';
 import { GlassButton } from '@/components/ui/GlassButton';
+import { AllocationBar } from '@/components/ui/AllocationBar';
+import { StockLogo } from '@/components/ui/StockLogo';
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { usePortfolioValue } from '@/hooks/usePortfolioValue';
-import { formatCurrency, formatPercent, formatCompactCurrency } from '@/lib/utils/formatting';
-import { calculateAllocation, calculateSectorAllocation } from '@/lib/utils/calculations';
-import { CHART_COLORS, POSITIVE_COLOR, NEGATIVE_COLOR } from '@/lib/utils/constants';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { useStockLogos } from '@/hooks/useStockLogos';
+import { formatCurrency } from '@/lib/utils/formatting';
+import { calculateAllocation } from '@/lib/utils/calculations';
+import { CHART_COLORS } from '@/lib/utils/constants';
+import { ACCOUNT_TYPE_LABELS } from '@/types/portfolio';
 
 const container = {
   hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.08 },
-  },
+  show: { opacity: 1, transition: { staggerChildren: 0.07 } },
 };
-
 const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0 },
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] } },
 };
 
 export default function DashboardPage() {
   const { accounts, positions } = usePortfolioStore();
-  const { enrichedPositions, totalValue, totalCostBasis, totalDayChange, isLoading } =
-    usePortfolioValue();
+  const { enrichedPositions, totalValue, totalCostBasis, isLoading } = usePortfolioValue();
 
   const totalGainLoss = totalValue - totalCostBasis;
   const totalGainLossPercent = totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
-  const dayChangePercent =
-    totalValue > 0 ? (totalDayChange / (totalValue - totalDayChange)) * 100 : 0;
 
   const allocation = calculateAllocation(enrichedPositions);
-  const sectorAllocation = calculateSectorAllocation(enrichedPositions);
-  const topHoldings = [...allocation].sort((a, b) => b.marketValue - a.marketValue).slice(0, 5);
+  const sortedAllocation = [...allocation].sort((a, b) => b.marketValue - a.marketValue);
+
+  const allTickers = Array.from(new Set(positions.map((p) => p.ticker)));
+  const logos = useStockLogos(allTickers);
+
+  // Allocation bar segments
+  const barSegments = sortedAllocation.slice(0, 8).map((a, i) => ({
+    ticker: a.ticker,
+    allocation: a.allocation,
+    color: CHART_COLORS[i % CHART_COLORS.length],
+  }));
+
+  // Per-account P&L
+  const accountStats = accounts.map((account) => {
+    const acctPositions = enrichedPositions.filter((p) => p.accountId === account.id);
+    const value = acctPositions.reduce((s, p) => s + (p.marketValue ?? 0), 0);
+    const cost = acctPositions.reduce((s, p) => s + (p.totalCostBasis ?? 0), 0);
+    const gainLoss = value - cost;
+    const gainLossPercent = cost > 0 ? (gainLoss / cost) * 100 : 0;
+    return { account, value, gainLoss, gainLossPercent };
+  });
 
   const hasPositions = positions.length > 0;
 
   if (!hasPositions) {
     return (
       <div>
-        <PageHeader
-          title="Dashboard"
-          description="Your portfolio command center"
-        />
+        <div className="mb-8 flex items-start justify-between">
+          <h1 className="text-2xl font-bold text-white">My Portfolio</h1>
+        </div>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-12 flex flex-col items-center justify-center text-center"
+          className="flex flex-col items-center justify-center text-center mt-12"
         >
           <GlassCard className="max-w-md mx-auto">
             <div className="text-center space-y-4">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-cyan-500/10 flex items-center justify-center">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" strokeWidth="1.5">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-green-500/10 flex items-center justify-center">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="1.5">
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-white">
-                Welcome to Your Portfolio Dashboard
-              </h3>
+              <h3 className="text-xl font-semibold text-white">Welcome to Your Portfolio</h3>
               <p className="text-white/50 text-sm">
-                Get started by adding your brokerage accounts and positions to see
-                your complete portfolio overview.
+                Add brokerage accounts and positions to see your complete portfolio overview.
               </p>
               <Link href="/portfolio">
-                <GlassButton variant="primary" size="lg">
-                  Add Your First Account
-                </GlassButton>
+                <GlassButton variant="primary" size="lg">Add Your First Account</GlassButton>
               </Link>
             </div>
           </GlassCard>
@@ -82,289 +89,222 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Dashboard"
-        description="Your portfolio command center"
-      />
+      {/* Page Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="mb-6 flex items-start justify-between"
+      >
+        <div>
+          <h1 className="text-2xl font-bold text-white">My Portfolio</h1>
+          <p className="text-sm text-white/40 mt-0.5">
+            {positions.length} positions &middot; {accounts.length} accounts
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-bold text-white">
+            {isLoading ? '—' : formatCurrency(totalValue)}
+          </p>
+          {!isLoading && (
+            <p className={`text-sm font-medium mt-0.5 ${totalGainLoss >= 0 ? 'text-green-400' : 'text-rose-400'}`}>
+              {totalGainLoss >= 0 ? '+' : ''}{formatCurrency(totalGainLoss)} open P&L
+            </p>
+          )}
+        </div>
+      </motion.div>
 
-      <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 mt-6">
-        {/* Summary Stats */}
-        <motion.div variants={item} className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <GlassCard hover={false}>
-            <p className="text-xs text-white/40 uppercase tracking-wider mb-1">
-              Total Value
-            </p>
-            <p className="text-2xl font-bold text-white">
-              {isLoading ? '...' : formatCurrency(totalValue)}
-            </p>
-          </GlassCard>
+      <motion.div variants={container} initial="hidden" animate="show" className="space-y-5">
 
-          <GlassCard hover={false}>
-            <p className="text-xs text-white/40 uppercase tracking-wider mb-1">
-              Total Gain/Loss
+        {/* Main Portfolio Card */}
+        <motion.div variants={item}>
+          <GlassCard padding="lg">
+            <p className="text-[11px] font-semibold tracking-[0.15em] text-white/30 uppercase mb-3">
+              Total Portfolio
             </p>
-            <p
-              className={`text-2xl font-bold ${
-                totalGainLoss >= 0 ? 'text-emerald-400' : 'text-rose-400'
-              }`}
-            >
-              {isLoading ? '...' : formatCurrency(totalGainLoss)}
+            <p className="text-4xl font-bold text-white mb-3">
+              {isLoading ? '—' : formatCurrency(totalValue)}
             </p>
-            <p
-              className={`text-sm ${
-                totalGainLoss >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70'
-              }`}
-            >
-              {isLoading ? '' : formatPercent(totalGainLossPercent)}
-            </p>
-          </GlassCard>
 
-          <GlassCard hover={false}>
-            <p className="text-xs text-white/40 uppercase tracking-wider mb-1">
-              Day Change
-            </p>
-            <p
-              className={`text-2xl font-bold ${
-                totalDayChange >= 0 ? 'text-emerald-400' : 'text-rose-400'
-              }`}
-            >
-              {isLoading ? '...' : formatCurrency(totalDayChange)}
-            </p>
-            <p
-              className={`text-sm ${
-                totalDayChange >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70'
-              }`}
-            >
-              {isLoading ? '' : formatPercent(dayChangePercent)}
-            </p>
-          </GlassCard>
+            {/* Gain/Loss pill */}
+            {!isLoading && (
+              <div className="flex items-center gap-2 mb-5 flex-wrap">
+                <span
+                  className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold ${
+                    totalGainLoss >= 0
+                      ? 'bg-green-500/15 text-green-400'
+                      : 'bg-rose-500/15 text-rose-400'
+                  }`}
+                >
+                  {totalGainLoss >= 0 ? '+' : ''}{formatCurrency(totalGainLoss)}
+                  {' '}({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(1)}%)
+                </span>
+                <span className="text-sm text-white/30">open P&L</span>
+              </div>
+            )}
 
-          <GlassCard hover={false}>
-            <p className="text-xs text-white/40 uppercase tracking-wider mb-1">
-              Accounts
-            </p>
-            <p className="text-2xl font-bold text-white">{accounts.length}</p>
-            <p className="text-sm text-white/40">{positions.length} positions</p>
-          </GlassCard>
-        </motion.div>
+            {/* Allocation bar */}
+            {barSegments.length > 0 && (
+              <div className="mb-4">
+                <AllocationBar segments={barSegments} height={10} />
+              </div>
+            )}
 
-        {/* Charts Row */}
-        <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Allocation Chart */}
-          <GlassCard>
-            <h3 className="text-sm font-medium text-white/60 mb-4">
-              Portfolio Allocation
-            </h3>
-            <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={allocation}
-                    dataKey="allocation"
-                    nameKey="ticker"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={90}
-                    paddingAngle={2}
-                    stroke="none"
-                  >
-                    {allocation.map((_, index) => (
-                      <Cell
-                        key={index}
-                        fill={CHART_COLORS[index % CHART_COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-[#1a1a4e]/90 backdrop-blur-xl border border-white/10 rounded-xl p-3 text-sm">
-                            <p className="text-white font-medium">{data.ticker}</p>
-                            <p className="text-white/60">
-                              {data.allocation.toFixed(1)}% &middot;{' '}
-                              {formatCurrency(data.marketValue)}
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-2">
-              {allocation.slice(0, 6).map((a, i) => (
-                <div key={a.ticker} className="flex items-center gap-1.5 text-xs text-white/60">
+            {/* Legend */}
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {sortedAllocation.slice(0, 6).map((a, i) => (
+                <div key={a.ticker} className="flex items-center gap-1.5 text-xs">
                   <div
-                    className="w-2.5 h-2.5 rounded-full"
+                    className="w-2 h-2 rounded-full flex-shrink-0"
                     style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
                   />
-                  {a.ticker} ({a.allocation.toFixed(1)}%)
+                  <span className="font-semibold text-white/70">{a.ticker}</span>
+                  <span className="text-white/40">{a.allocation.toFixed(0)}%</span>
                 </div>
               ))}
-              {allocation.length > 6 && (
-                <span className="text-xs text-white/30">
-                  +{allocation.length - 6} more
-                </span>
+              {sortedAllocation.length > 6 && (
+                <span className="text-xs text-white/25">+{sortedAllocation.length - 6} more</span>
               )}
             </div>
           </GlassCard>
+        </motion.div>
 
-          {/* Top Holdings */}
-          <GlassCard>
-            <h3 className="text-sm font-medium text-white/60 mb-4">
-              Top Holdings
-            </h3>
-            <div className="space-y-3">
-              {topHoldings.map((holding) => {
-                const pos = enrichedPositions.find(
-                  (p) => p.ticker === holding.ticker
-                );
+        {/* Account Cards Grid */}
+        {accountStats.length > 0 && (
+          <motion.div variants={item}>
+            <div className="grid grid-cols-2 gap-3">
+              {accountStats.map(({ account, value, gainLoss, gainLossPercent }) => (
+                <GlassCard key={account.id} padding="md" hover={false}>
+                  <p className="text-[10px] font-semibold tracking-[0.12em] text-white/30 uppercase mb-2 truncate">
+                    {ACCOUNT_TYPE_LABELS[account.accountType] ?? account.name}
+                  </p>
+                  <p className="text-xl font-bold text-white mb-1">
+                    {formatCurrency(value)}
+                  </p>
+                  <p className={`text-xs font-medium ${gainLoss >= 0 ? 'text-green-400' : 'text-rose-400'}`}>
+                    {gainLoss >= 0 ? '+' : ''}{formatCurrency(gainLoss)}
+                    <span className="text-white/20 mx-1">&middot;</span>
+                    {gainLoss >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%
+                  </p>
+                </GlassCard>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Holdings */}
+        <motion.div variants={item}>
+          <p className="text-[11px] font-semibold tracking-[0.15em] text-white/30 uppercase mb-3 px-1">
+            Holdings
+          </p>
+          <GlassCard padding="none">
+            <div className="divide-y divide-white/[0.05]">
+              {sortedAllocation.map((holding, i) => {
+                const pos = enrichedPositions.find((p) => p.ticker === holding.ticker);
+                const gainLossPercent = pos?.gainLossPercent ?? 0;
+                const isPositive = gainLossPercent >= 0;
+
                 return (
                   <div
                     key={holding.ticker}
-                    className="flex items-center justify-between py-2 border-b border-white/[0.04] last:border-0"
+                    className="flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.03] transition-colors"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-white/[0.06] flex items-center justify-center text-xs font-bold text-white/80">
-                        {holding.ticker.slice(0, 2)}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-white">
-                          {holding.ticker}
-                        </p>
-                        <p className="text-xs text-white/40">
-                          {holding.companyName}
-                        </p>
+                    <StockLogo
+                      ticker={holding.ticker}
+                      logoUrl={logos[holding.ticker]}
+                      size={44}
+                    />
+
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white">{holding.ticker}</p>
+                      <p className="text-xs text-white/40 truncate">
+                        {holding.companyName}
+                        <span className="text-white/20 mx-1">&middot;</span>
+                        {holding.allocation.toFixed(1)}%
+                      </p>
+                      <div className="mt-1.5 h-1 w-20 rounded-full bg-white/[0.06] overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${Math.min(holding.allocation, 100)}%`,
+                            backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+                          }}
+                        />
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-white">
+
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-bold text-white">
                         {formatCurrency(holding.marketValue)}
                       </p>
-                      {pos && (
-                        <p
-                          className={`text-xs ${
-                            pos.gainLossPercent >= 0
-                              ? 'text-emerald-400'
-                              : 'text-rose-400'
-                          }`}
-                        >
-                          {formatPercent(pos.gainLossPercent)}
-                        </p>
-                      )}
+                      <p className={`text-xs font-medium ${isPositive ? 'text-green-400' : 'text-rose-400'}`}>
+                        {isPositive ? '+' : ''}{gainLossPercent.toFixed(2)}%
+                      </p>
                     </div>
+
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/20 flex-shrink-0">
+                      <path d="M9 18l6-6-6-6" />
+                    </svg>
                   </div>
                 );
               })}
-            </div>
-            <Link href="/portfolio" className="block mt-4">
-              <GlassButton variant="ghost" size="sm" className="w-full">
-                View All Positions
-              </GlassButton>
-            </Link>
-          </GlassCard>
-        </motion.div>
-
-        {/* Sector Breakdown */}
-        <motion.div variants={item}>
-          <GlassCard>
-            <h3 className="text-sm font-medium text-white/60 mb-4">
-              Sector Breakdown
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {sectorAllocation.map((sector, i) => (
-                <div
-                  key={sector.sector}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03]"
-                >
-                  <div
-                    className="w-1 h-8 rounded-full"
-                    style={{
-                      backgroundColor:
-                        CHART_COLORS[i % CHART_COLORS.length],
-                    }}
-                  />
-                  <div>
-                    <p className="text-xs text-white/40">{sector.sector}</p>
-                    <p className="text-sm font-medium text-white">
-                      {sector.allocation.toFixed(1)}%
-                    </p>
-                  </div>
-                </div>
-              ))}
             </div>
           </GlassCard>
         </motion.div>
 
         {/* Quick Links */}
-        <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-3 gap-3 pb-4">
           <Link href="/recommendations">
-            <GlassCard className="group cursor-pointer">
+            <GlassCard className="group cursor-pointer" padding="md">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2">
+                <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2">
                     <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
                     <polyline points="17 6 23 6 23 12" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white group-hover:text-cyan-300 transition-colors">
-                    Weekly Buys
-                  </p>
-                  <p className="text-xs text-white/40">
-                    See this week&apos;s top picks
-                  </p>
+                  <p className="text-sm font-semibold text-white group-hover:text-green-400 transition-colors">Weekly Buys</p>
+                  <p className="text-xs text-white/40">This week&apos;s top picks</p>
                 </div>
               </div>
             </GlassCard>
           </Link>
 
           <Link href="/rebalance">
-            <GlassCard className="group cursor-pointer">
+            <GlassCard className="group cursor-pointer" padding="md">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2">
+                <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center flex-shrink-0">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2">
                     <path d="M21 12a9 9 0 11-6.219-8.56" />
                     <circle cx="12" cy="12" r="3" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white group-hover:text-cyan-300 transition-colors">
-                    Rebalance
-                  </p>
-                  <p className="text-xs text-white/40">
-                    Optimize your allocation
-                  </p>
+                  <p className="text-sm font-semibold text-white group-hover:text-violet-400 transition-colors">Rebalance</p>
+                  <p className="text-xs text-white/40">Optimize your allocation</p>
                 </div>
               </div>
             </GlassCard>
           </Link>
 
           <Link href="/mock-builder">
-            <GlassCard className="group cursor-pointer">
+            <GlassCard className="group cursor-pointer" padding="md">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
                     <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white group-hover:text-cyan-300 transition-colors">
-                    Mock Builder
-                  </p>
-                  <p className="text-xs text-white/40">
-                    Build a hypothetical portfolio
-                  </p>
+                  <p className="text-sm font-semibold text-white group-hover:text-amber-400 transition-colors">Mock Builder</p>
+                  <p className="text-xs text-white/40">Hypothetical portfolio</p>
                 </div>
               </div>
             </GlassCard>
           </Link>
         </motion.div>
+
       </motion.div>
     </div>
   );
