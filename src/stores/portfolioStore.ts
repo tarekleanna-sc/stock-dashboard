@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { type SupabaseClient } from '@supabase/supabase-js';
-import { BrokerAccount, Position, BrokerName, AccountType } from '@/types/portfolio';
+import { BrokerAccount, Position, ClosedPosition, BrokerName, AccountType } from '@/types/portfolio';
 
 interface PortfolioState {
   accounts: BrokerAccount[];
   positions: Position[];
+  closedPositions: ClosedPosition[];
   watchlist: string[];
   targetAllocations: Record<string, number>;
   snapshots: { date: string; totalValue: number }[];
@@ -36,6 +37,14 @@ interface PortfolioState {
   // Snapshot actions
   addSnapshot: (totalValue: number, supabase: SupabaseClient, userId: string) => Promise<void>;
 
+  // Closed position actions
+  closePosition: (
+    data: { positionId: string; salePrice: number; closedAt: string; notes?: string },
+    supabase: SupabaseClient,
+    userId: string
+  ) => Promise<void>;
+  deleteClosedPosition: (id: string, supabase: SupabaseClient) => Promise<void>;
+
   // Helpers
   getPositionsByAccount: (accountId: string) => Position[];
   getUniqueTickers: () => string[];
@@ -46,6 +55,7 @@ const DEFAULT_WATCHLIST = ['AAPL', 'MSFT', 'GOOG', 'AMZN', 'NVDA', 'META', 'TSLA
 const INITIAL_STATE = {
   accounts: [] as BrokerAccount[],
   positions: [] as Position[],
+  closedPositions: [] as ClosedPosition[],
   watchlist: DEFAULT_WATCHLIST,
   targetAllocations: {} as Record<string, number>,
   snapshots: [] as { date: string; totalValue: number }[],
@@ -56,12 +66,13 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
   ...INITIAL_STATE,
 
   hydrate: async (supabase, userId) => {
-    const [accountsRes, positionsRes, watchlistRes, allocationsRes, snapshotsRes] = await Promise.all([
+    const [accountsRes, positionsRes, watchlistRes, allocationsRes, snapshotsRes, closedRes] = await Promise.all([
       supabase.from('accounts').select('*').eq('user_id', userId).order('created_at'),
       supabase.from('positions').select('*').eq('user_id', userId).order('created_at'),
       supabase.from('watchlist_items').select('symbol').eq('user_id', userId),
       supabase.from('target_allocations').select('*').eq('user_id', userId),
       supabase.from('snapshots').select('date, total_value').eq('user_id', userId).order('date'),
+      supabase.from('closed_positions').select('*').eq('user_id', userId).order('closed_at', { ascending: false }),
     ]);
 
     // Surface RLS / permission errors so they're visible in the console
@@ -70,6 +81,7 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
     if (watchlistRes.error) console.error('[Portfolio] watchlist fetch error:', watchlistRes.error.message);
     if (allocationsRes.error) console.error('[Portfolio] allocations fetch error:', allocationsRes.error.message);
     if (snapshotsRes.error) console.error('[Portfolio] snapshots fetch error:', snapshotsRes.error.message);
+    if (closedRes.error && closedRes.error.code !== '42P01') console.error('[Portfolio] closed_positions fetch error:', closedRes.error.message);
 
     const accounts: BrokerAccount[] = (accountsRes.data ?? []).map((r) => ({
       id: r.id,
@@ -109,7 +121,24 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
       totalValue: r.total_value,
     }));
 
-    set({ accounts, positions, watchlist, targetAllocations, snapshots, hydrated: true });
+    const closedPositions: ClosedPosition[] = (closedRes.data ?? []).map((r) => {
+      const gain = (r.sale_price - r.avg_cost) * r.shares;
+      const gainPct = r.avg_cost > 0 ? ((r.sale_price - r.avg_cost) / r.avg_cost) * 100 : 0;
+      return {
+        id: r.id,
+        accountId: r.account_id,
+        ticker: r.symbol,
+        shares: r.shares,
+        costBasisPerShare: r.avg_cost,
+        salePrice: r.sale_price,
+        closedAt: r.closed_at,
+        notes: r.notes,
+        realizedGain: parseFloat(gain.toFixed(2)),
+        realizedGainPct: parseFloat(gainPct.toFixed(2)),
+      };
+    });
+
+    set({ accounts, positions, closedPositions, watchlist, targetAllocations, snapshots, hydrated: true });
   },
 
   reset: () => set({ ...INITIAL_STATE }),
@@ -239,4 +268,56 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
     get().positions.filter((p) => p.accountId === accountId),
 
   getUniqueTickers: () => [...new Set(get().positions.map((p) => p.ticker))],
+
+  closePosition: async ({ positionId, salePrice, closedAt, notes }, supabase, userId) => {
+    const position = get().positions.find((p) => p.id === positionId);
+    if (!position) return;
+
+    const id = uuidv4();
+    const gain = (salePrice - position.costBasisPerShare) * position.shares;
+    const gainPct =
+      position.costBasisPerShare > 0
+        ? ((salePrice - position.costBasisPerShare) / position.costBasisPerShare) * 100
+        : 0;
+
+    const newClosed: ClosedPosition = {
+      id,
+      accountId: position.accountId,
+      ticker: position.ticker,
+      shares: position.shares,
+      costBasisPerShare: position.costBasisPerShare,
+      salePrice,
+      closedAt,
+      notes,
+      realizedGain: parseFloat(gain.toFixed(2)),
+      realizedGainPct: parseFloat(gainPct.toFixed(2)),
+    };
+
+    // Optimistic update: remove from open, add to closed
+    set((state) => ({
+      positions: state.positions.filter((p) => p.id !== positionId),
+      closedPositions: [newClosed, ...state.closedPositions],
+    }));
+
+    // Write closed record then delete open position
+    await supabase.from('closed_positions').insert({
+      id,
+      user_id: userId,
+      account_id: position.accountId,
+      symbol: position.ticker,
+      shares: position.shares,
+      avg_cost: position.costBasisPerShare,
+      sale_price: salePrice,
+      closed_at: closedAt,
+      notes: notes ?? null,
+    });
+    await supabase.from('positions').delete().eq('id', positionId);
+  },
+
+  deleteClosedPosition: async (id, supabase) => {
+    set((state) => ({
+      closedPositions: state.closedPositions.filter((c) => c.id !== id),
+    }));
+    await supabase.from('closed_positions').delete().eq('id', id);
+  },
 }));

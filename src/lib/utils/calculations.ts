@@ -23,6 +23,9 @@ export function enrichPosition(
     dayChangePercent: quote?.changesPercentage ?? 0,
     sector: profile?.sector ?? 'Unknown',
     companyName: profile?.companyName ?? quote?.name ?? position.ticker,
+    yearHigh: quote?.yearHigh ?? 0,
+    yearLow: quote?.yearLow ?? 0,
+    beta: profile?.beta ?? 1,
   };
 }
 

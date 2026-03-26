@@ -48,12 +48,31 @@ export interface PositionWithMarketData extends Position {
   dayChangePercent: number;
   sector: string;
   companyName: string;
+  // 52-week range (from StockQuote)
+  yearHigh: number;
+  yearLow: number;
+  // Risk
+  beta: number;
 }
 
 export interface PortfolioSnapshot {
   date: string;
   totalValue: number;
   totalCostBasis: number;
+}
+
+export interface ClosedPosition {
+  id: string;
+  accountId: string;
+  ticker: string;
+  shares: number;
+  costBasisPerShare: number;
+  salePrice: number;
+  closedAt: string;        // ISO date string (YYYY-MM-DD)
+  notes?: string;
+  // Derived
+  realizedGain: number;    // (salePrice - costBasis) * shares
+  realizedGainPct: number; // %
 }
 
 export const BROKER_LABELS: Record<BrokerName, string> = {

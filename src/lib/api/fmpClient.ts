@@ -402,3 +402,57 @@ export async function fetchSearchResults(
     }));
   }
 }
+
+// ─── Dividends ────────────────────────────────────────────────────────────────
+
+export interface DividendRecord {
+  symbol: string;
+  date: string;          // ex-dividend date
+  recordDate: string;
+  paymentDate: string;
+  declarationDate: string;
+  adjDividend: number;   // adjusted per-share dividend
+  dividend: number;      // raw per-share dividend
+  label?: string;
+}
+
+export async function fetchDividends(
+  symbol: string,
+  limit: number = 10
+): Promise<DividendRecord[]> {
+  try {
+    const data = await fetchFromStable<DividendRecord[]>(
+      `/dividends?symbol=${normalizeFmpSymbol(symbol)}&limit=${limit}`
+    );
+    return (data ?? []).map((d) => ({ ...d, symbol: symbol.toUpperCase() }));
+  } catch (error) {
+    console.error(`[FMP Client] Error fetching dividends for ${symbol}:`, error);
+    return [];
+  }
+}
+
+// ─── Dividend Calendar (upcoming ex-dates) ───────────────────────────────────
+
+export interface UpcomingDividend {
+  symbol: string;
+  exDividendDate: string;
+  dividendAmount: number;
+  paymentDate: string;
+  recordDate: string;
+  declarationDate: string;
+}
+
+export async function fetchDividendCalendar(
+  from: string,
+  to: string
+): Promise<UpcomingDividend[]> {
+  try {
+    const data = await fetchFromStable<UpcomingDividend[]>(
+      `/dividends-calendar?from=${from}&to=${to}`
+    );
+    return data ?? [];
+  } catch (error) {
+    console.error('[FMP Client] Error fetching dividend calendar:', error);
+    return [];
+  }
+}

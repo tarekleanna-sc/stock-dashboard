@@ -9,6 +9,8 @@ import AccountCard from '@/components/portfolio/AccountCard';
 import PositionRow from '@/components/portfolio/PositionRow';
 import PositionForm from '@/components/portfolio/PositionForm';
 import CSVImportModal from '@/components/portfolio/CSVImportModal';
+import ClosePositionModal from '@/components/portfolio/ClosePositionModal';
+import ClosedPositionsSection from '@/components/portfolio/ClosedPositionsSection';
 import { GlassButton } from '@/components/ui/GlassButton';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GlassModal } from '@/components/ui/GlassModal';
@@ -19,18 +21,22 @@ import { usePortfolioValue } from '@/hooks/usePortfolioValue';
 import { useStockLogos } from '@/hooks/useStockLogos';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { accountSchema, AccountFormData, PositionFormData } from '@/lib/validators/schemas';
-import { BrokerAccount, Position, BROKER_LABELS, ACCOUNT_TYPE_LABELS } from '@/types/portfolio';
+import { BrokerAccount, Position, PositionWithMarketData, BROKER_LABELS, ACCOUNT_TYPE_LABELS } from '@/types/portfolio';
+import { exportPortfolioToCSV } from '@/lib/utils/exportPortfolio';
 
 export default function PortfolioPage() {
   const { supabase, user } = useSupabase();
   const {
     accounts,
+    closedPositions,
     addAccount,
     updateAccount,
     deleteAccount,
     addPosition,
     updatePosition,
     deletePosition,
+    closePosition,
+    deleteClosedPosition,
     getPositionsByAccount,
   } = usePortfolioStore();
 
@@ -46,12 +52,14 @@ export default function PortfolioPage() {
   const [isPositionModalOpen, setIsPositionModalOpen] = useState(false);
   const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false);
   const [isDeletePositionModalOpen, setIsDeletePositionModalOpen] = useState(false);
+  const [isClosePositionModalOpen, setIsClosePositionModalOpen] = useState(false);
 
   // Editing states
   const [editingAccount, setEditingAccount] = useState<BrokerAccount | null>(null);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<BrokerAccount | null>(null);
   const [deletingPosition, setDeletingPosition] = useState<Position | null>(null);
+  const [closingPosition, setClosingPosition] = useState<PositionWithMarketData | null>(null);
   const [preselectedAccountId, setPreselectedAccountId] = useState<string | undefined>(undefined);
   const [isCSVImportOpen, setIsCSVImportOpen] = useState(false);
 
@@ -191,6 +199,28 @@ export default function PortfolioPage() {
           </svg>
           Import CSV
         </GlassButton>
+        <GlassButton
+          variant="ghost"
+          onClick={() => exportPortfolioToCSV(enrichedPositions, accounts, closedPositions)}
+          disabled={enrichedPositions.length === 0}
+          title="Export portfolio to CSV (opens in Excel)"
+        >
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+          </svg>
+          Export CSV
+        </GlassButton>
+        <GlassButton
+          variant="ghost"
+          onClick={() => window.open('/report', '_blank')}
+          disabled={enrichedPositions.length === 0}
+          title="Generate printable PDF report"
+        >
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          PDF Report
+        </GlassButton>
       </div>
 
       {/* Accounts & Positions */}
@@ -249,6 +279,7 @@ export default function PortfolioPage() {
                           position={position}
                           onEdit={handleOpenEditPosition}
                           onDelete={handleOpenDeletePosition}
+                          onClose={(pos) => { setClosingPosition(pos); setIsClosePositionModalOpen(true); }}
                           logoUrl={logos[position.ticker]}
                         />
                       ))}
@@ -439,6 +470,26 @@ export default function PortfolioPage() {
           </div>
         </div>
       </GlassModal>
+
+      {/* Close Position Modal */}
+      <ClosePositionModal
+        position={closingPosition}
+        isOpen={isClosePositionModalOpen}
+        onClose={() => {
+          setIsClosePositionModalOpen(false);
+          setClosingPosition(null);
+        }}
+        onConfirm={async (positionId, salePrice, closedAt, notes) => {
+          if (!user) return;
+          await closePosition({ positionId, salePrice, closedAt, notes }, supabase, user.id);
+        }}
+      />
+
+      {/* Closed Positions */}
+      <ClosedPositionsSection
+        closedPositions={closedPositions}
+        onDelete={(id) => deleteClosedPosition(id, supabase)}
+      />
     </div>
   );
 }

@@ -11,6 +11,10 @@ import { usePortfolioStore } from '@/stores/portfolioStore';
 import { usePortfolioValue } from '@/hooks/usePortfolioValue';
 import { useAutoSnapshot } from '@/hooks/useAutoSnapshot';
 import { useStockLogos } from '@/hooks/useStockLogos';
+import { useDividendData } from '@/hooks/useDividendData';
+import { useRiskMetrics } from '@/hooks/useRiskMetrics';
+import DividendCard from '@/components/dashboard/DividendCard';
+import RiskMetricsCard from '@/components/dashboard/RiskMetricsCard';
 import { formatCurrency } from '@/lib/utils/formatting';
 import { calculateAllocation } from '@/lib/utils/calculations';
 import { CHART_COLORS } from '@/lib/utils/constants';
@@ -40,11 +44,17 @@ const item = {
 };
 
 export default function DashboardPage() {
-  const { accounts, positions } = usePortfolioStore();
+  const { accounts, positions, snapshots } = usePortfolioStore();
   const { enrichedPositions, totalValue, totalCostBasis, isLoading, refetch, dataUpdatedAt } = usePortfolioValue();
 
   // Auto-capture daily snapshot
   useAutoSnapshot(totalValue, isLoading);
+
+  // Phase 3.2: Dividend data
+  const dividendSummary = useDividendData(enrichedPositions);
+
+  // Phase 3.3: Risk metrics
+  const riskMetrics = useRiskMetrics(enrichedPositions, snapshots);
 
   const lastUpdatedLabel = useLastUpdated(dataUpdatedAt ?? 0);
 
@@ -110,14 +120,15 @@ export default function DashboardPage() {
     color: CHART_COLORS[i % CHART_COLORS.length],
   }));
 
-  // Per-account P&L
+  // Per-account P&L (3.5 — includes cost basis)
   const accountStats = accounts.map((account) => {
     const acctPositions = enrichedPositions.filter((p) => p.accountId === account.id);
     const value = acctPositions.reduce((s, p) => s + (p.marketValue ?? 0), 0);
     const cost = acctPositions.reduce((s, p) => s + (p.totalCostBasis ?? 0), 0);
+    const cashBalance = account.cashBalance ?? 0;
     const gainLoss = value - cost;
     const gainLossPercent = cost > 0 ? (gainLoss / cost) * 100 : 0;
-    return { account, value, gainLoss, gainLossPercent };
+    return { account, value, cost, cashBalance, gainLoss, gainLossPercent };
   });
 
   const hasPositions = positions.length > 0;
@@ -224,7 +235,7 @@ export default function DashboardPage() {
               {isLoading ? '—' : formatCurrency(totalValue)}
             </p>
 
-            {/* Gain/Loss pill */}
+            {/* Gain/Loss pill + cost basis (3.5) */}
             {!isLoading && (
               <div className="flex items-center gap-2 mb-5 flex-wrap">
                 <span
@@ -238,6 +249,9 @@ export default function DashboardPage() {
                   {' '}({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(1)}%)
                 </span>
                 <span className="text-sm text-white/30">open P&L</span>
+                <span className="text-xs text-white/20 ml-1">
+                  · Cost basis {formatCurrency(totalCostBasis)}
+                </span>
               </div>
             )}
 
@@ -271,7 +285,7 @@ export default function DashboardPage() {
         {accountStats.length > 0 && (
           <motion.div variants={item}>
             <div className="grid grid-cols-2 gap-3">
-              {accountStats.map(({ account, value, gainLoss, gainLossPercent }) => (
+              {accountStats.map(({ account, value, cost, cashBalance, gainLoss, gainLossPercent }) => (
                 <GlassCard key={account.id} padding="md" hover={false}>
                   <p className="text-[10px] font-semibold tracking-[0.12em] text-white/30 uppercase mb-2 truncate">
                     {ACCOUNT_TYPE_LABELS[account.accountType] ?? account.name}
@@ -284,9 +298,22 @@ export default function DashboardPage() {
                     <span className="text-white/20 mx-1">&middot;</span>
                     {gainLoss >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%
                   </p>
+                  {/* 3.5 — cost basis on account card */}
+                  <p className="text-[10px] text-white/20 mt-1">
+                    Basis {formatCurrency(cost)}
+                    {cashBalance > 0 && <span className="ml-1.5">+ {formatCurrency(cashBalance)} cash</span>}
+                  </p>
                 </GlassCard>
               ))}
             </div>
+          </motion.div>
+        )}
+
+        {/* 3.2 Dividend Card + 3.3 Risk Metrics */}
+        {!isLoading && enrichedPositions.length > 0 && (
+          <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <DividendCard summary={dividendSummary} />
+            <RiskMetricsCard metrics={riskMetrics} isLoading={isLoading} />
           </motion.div>
         )}
 
@@ -380,6 +407,15 @@ export default function DashboardPage() {
                       <p className={`text-xs font-medium ${isPositive ? 'text-green-400' : 'text-rose-400'}`}>
                         {isPositive ? '+' : ''}{gainLossPercent.toFixed(2)}%
                       </p>
+                      {/* 3.5 cost basis per holding */}
+                      {(() => {
+                        const pos = enrichedPositions.find((p) => p.ticker === holding.ticker);
+                        return pos && pos.totalCostBasis > 0 ? (
+                          <p className="text-[10px] text-white/20 mt-0.5">
+                            basis {formatCurrency(pos.totalCostBasis)}
+                          </p>
+                        ) : null;
+                      })()}
                     </div>
 
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/20 flex-shrink-0">

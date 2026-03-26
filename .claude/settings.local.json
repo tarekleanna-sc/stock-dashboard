@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Read(//Users/tarekleanna/**)",
+      "Read(//usr/local/**)",
+      "Read(//opt/**)",
+      "Bash(curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh)",
+      "Bash(bash)",
+      "Bash(npx create-next-app@latest stock-dashboard --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --turbopack)",
+      "Bash(ls \"/Users/tarekleanna/Stock Dashboard/src/app/\\(dashboard\\)/recommendations/\")",
+      "Bash(npx next:*)"
+    ]
+  }
+}

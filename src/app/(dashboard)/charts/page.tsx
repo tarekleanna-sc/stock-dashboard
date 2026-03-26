@@ -7,8 +7,10 @@ import AllocationPieChart from '@/components/charts/AllocationPieChart';
 import PerformanceLineChart from '@/components/charts/PerformanceLineChart';
 import SectorBreakdownChart from '@/components/charts/SectorBreakdownChart';
 import ValueOverTimeChart from '@/components/charts/ValueOverTimeChart';
+import BenchmarkOverlayChart from '@/components/charts/BenchmarkOverlayChart';
 import { usePortfolioValue } from '@/hooks/usePortfolioValue';
 import { usePortfolioStore } from '@/stores/portfolioStore';
+import { useBenchmarkComparison, BENCHMARK_LABELS, type BenchmarkSymbol } from '@/hooks/useBenchmarkComparison';
 
 type DateRange = '1M' | '3M' | '6M' | '1Y' | 'ALL';
 
@@ -37,6 +39,7 @@ export default function ChartsPage() {
 
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRange>('ALL');
+  const [benchmark, setBenchmark] = useState<BenchmarkSymbol | null>(null);
 
   // Filter positions by selected account
   const filteredPositions = useMemo(() => {
@@ -50,6 +53,14 @@ export default function ChartsPage() {
     if (!cutoff) return snapshots;
     return snapshots.filter((s) => new Date(s.date) >= cutoff);
   }, [snapshots, dateRange]);
+
+  // Derive earliest date in filtered snapshots for benchmark window
+  const benchmarkFromDate = useMemo(() => {
+    if (!filteredSnapshots || filteredSnapshots.length === 0) return null;
+    return [...filteredSnapshots].sort((a, b) => a.date.localeCompare(b.date))[0]?.date ?? null;
+  }, [filteredSnapshots]);
+
+  const { data: benchmarkData = [] } = useBenchmarkComparison(benchmark, benchmarkFromDate);
 
   if (isLoading) {
     return (
@@ -151,31 +162,65 @@ export default function ChartsPage() {
         </GlassCard>
       </div>
 
-      {/* Portfolio Value Over Time with date range filter */}
+      {/* Portfolio Value Over Time with date range + benchmark filter */}
       <GlassCard>
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <h3 className="text-white/80 text-sm font-medium">Portfolio Value Over Time</h3>
+        <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
+          <h3 className="text-white/80 text-sm font-medium">
+            {benchmark ? 'Portfolio vs Benchmark (% Return)' : 'Portfolio Value Over Time'}
+          </h3>
 
-          {/* Date range buttons */}
-          <div className="flex items-center gap-1">
-            {DATE_RANGE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setDateRange(opt.value)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                  dateRange === opt.value
-                    ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                    : 'text-white/40 hover:text-white/70 hover:bg-white/[0.05] border border-transparent'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Benchmark selector */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-white/30">vs</span>
+              {(['None', 'SPY', 'QQQ', 'DIA', 'IWM'] as const).map((sym) => {
+                const val = sym === 'None' ? null : sym as BenchmarkSymbol;
+                const isActive = benchmark === val;
+                return (
+                  <button
+                    key={sym}
+                    onClick={() => setBenchmark(val)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                      isActive
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        : 'text-white/40 hover:text-white/70 hover:bg-white/[0.05] border border-transparent'
+                    }`}
+                  >
+                    {sym === 'None' ? '—' : sym}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Date range buttons */}
+            <div className="flex items-center gap-1">
+              {DATE_RANGE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setDateRange(opt.value)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                    dateRange === opt.value
+                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                      : 'text-white/40 hover:text-white/70 hover:bg-white/[0.05] border border-transparent'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         <div className="min-h-[300px]">
-          <ValueOverTimeChart snapshots={filteredSnapshots} />
+          {benchmark ? (
+            <BenchmarkOverlayChart
+              snapshots={filteredSnapshots}
+              benchmarkData={benchmarkData}
+              benchmarkLabel={BENCHMARK_LABELS[benchmark]}
+            />
+          ) : (
+            <ValueOverTimeChart snapshots={filteredSnapshots} />
+          )}
         </div>
 
         {snapshots.length > 0 && filteredSnapshots.length === 0 && (
