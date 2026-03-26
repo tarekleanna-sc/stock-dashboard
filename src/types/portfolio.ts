@@ -24,6 +24,7 @@ export interface BrokerAccount {
   name: string;
   broker: BrokerName;
   accountType: AccountType;
+  cashBalance: number; // cash held in this account (requires DB column: cash_balance numeric DEFAULT 0)
   createdAt: string;
 }
 

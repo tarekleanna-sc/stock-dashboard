@@ -19,6 +19,8 @@ export default function AccountCard({ account, positions, onEdit, onDelete }: Ac
   const totalGainLoss = totalMarketValue - totalCostBasis;
   const totalGainLossPercent = totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
   const isPositive = totalGainLoss >= 0;
+  const cash = account.cashBalance ?? 0;
+  const totalWithCash = totalMarketValue + cash;
 
   return (
     <GlassCard padding="sm">
@@ -42,11 +44,27 @@ export default function AccountCard({ account, positions, onEdit, onDelete }: Ac
         </div>
       </div>
 
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-6 flex-wrap">
         <div>
-          <p className="text-xs text-white/50 uppercase tracking-wider">Market Value</p>
+          <p className="text-xs text-white/50 uppercase tracking-wider">
+            {cash > 0 ? 'Invested' : 'Market Value'}
+          </p>
           <p className="text-xl font-bold text-white">{formatCurrency(totalMarketValue)}</p>
         </div>
+
+        {cash > 0 && (
+          <>
+            <div>
+              <p className="text-xs text-white/50 uppercase tracking-wider">Cash</p>
+              <p className="text-xl font-bold text-cyan-300">{formatCurrency(cash)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-white/50 uppercase tracking-wider">Total</p>
+              <p className="text-xl font-bold text-white">{formatCurrency(totalWithCash)}</p>
+            </div>
+          </>
+        )}
+
         <div>
           <p className="text-xs text-white/50 uppercase tracking-wider">Gain/Loss</p>
           <p className={`text-lg font-semibold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>

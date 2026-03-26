@@ -23,6 +23,7 @@ export const accountSchema = z.object({
   accountType: z.enum([
     'brokerage', 'roth_ira', 'traditional_ira', '401k', 'hsa', '529', 'other',
   ]),
+  cashBalance: z.number().min(0, 'Cash balance cannot be negative').optional(),
 });
 
 export type AccountFormData = z.infer<typeof accountSchema>;

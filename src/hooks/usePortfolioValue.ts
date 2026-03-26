@@ -16,7 +16,7 @@ export function usePortfolioValue() {
     return Array.from(tickers);
   }, [positions]);
 
-  const { data: quotes = [], isLoading, error } = useStockQuotes(uniqueTickers);
+  const { data: quotes = [], isLoading, error, refetch, dataUpdatedAt } = useStockQuotes(uniqueTickers);
   const profileMap = useStockProfiles(uniqueTickers);
 
   const quoteMap = useMemo(() => {
@@ -58,5 +58,7 @@ export function usePortfolioValue() {
     totalDayChange,
     isLoading,
     error,
+    refetch,
+    dataUpdatedAt,
   };
 }

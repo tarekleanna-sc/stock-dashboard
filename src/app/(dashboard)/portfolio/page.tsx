@@ -8,6 +8,7 @@ import PortfolioSummary from '@/components/portfolio/PortfolioSummary';
 import AccountCard from '@/components/portfolio/AccountCard';
 import PositionRow from '@/components/portfolio/PositionRow';
 import PositionForm from '@/components/portfolio/PositionForm';
+import CSVImportModal from '@/components/portfolio/CSVImportModal';
 import { GlassButton } from '@/components/ui/GlassButton';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GlassModal } from '@/components/ui/GlassModal';
@@ -52,6 +53,7 @@ export default function PortfolioPage() {
   const [deletingAccount, setDeletingAccount] = useState<BrokerAccount | null>(null);
   const [deletingPosition, setDeletingPosition] = useState<Position | null>(null);
   const [preselectedAccountId, setPreselectedAccountId] = useState<string | undefined>(undefined);
+  const [isCSVImportOpen, setIsCSVImportOpen] = useState(false);
 
   // Account form
   const accountForm = useForm<AccountFormData>({
@@ -82,7 +84,7 @@ export default function PortfolioPage() {
   // Account CRUD handlers
   const handleOpenAddAccount = () => {
     setEditingAccount(null);
-    accountForm.reset({ name: '', broker: undefined, accountType: undefined });
+    accountForm.reset({ name: '', broker: undefined, accountType: undefined, cashBalance: 0 });
     setIsAccountModalOpen(true);
   };
 
@@ -92,6 +94,7 @@ export default function PortfolioPage() {
       name: account.name,
       broker: account.broker,
       accountType: account.accountType,
+      cashBalance: account.cashBalance ?? 0,
     });
     setIsAccountModalOpen(true);
   };
@@ -169,7 +172,7 @@ export default function PortfolioPage() {
       <PortfolioSummary />
 
       {/* Action Buttons */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <GlassButton onClick={handleOpenAddAccount}>
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -181,6 +184,12 @@ export default function PortfolioPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           Add Position
+        </GlassButton>
+        <GlassButton variant="ghost" onClick={() => setIsCSVImportOpen(true)} disabled={accounts.length === 0}>
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+          Import CSV
         </GlassButton>
       </div>
 
@@ -311,6 +320,19 @@ export default function PortfolioPage() {
               error={accountForm.formState.errors.accountType?.message}
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-white/70 mb-1">
+              Cash Balance <span className="text-white/30 font-normal">(optional)</span>
+            </label>
+            <GlassInput
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              {...accountForm.register('cashBalance', { valueAsNumber: true })}
+              error={accountForm.formState.errors.cashBalance?.message}
+            />
+          </div>
           <div className="flex items-center justify-end gap-3 pt-2">
             <GlassButton
               variant="ghost"
@@ -379,6 +401,13 @@ export default function PortfolioPage() {
           </div>
         </div>
       </GlassModal>
+
+      {/* CSV Import Modal */}
+      <CSVImportModal
+        isOpen={isCSVImportOpen}
+        onClose={() => setIsCSVImportOpen(false)}
+        accounts={accounts}
+      />
 
       {/* Delete Position Confirmation */}
       <GlassModal

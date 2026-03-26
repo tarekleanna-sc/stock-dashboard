@@ -16,7 +16,7 @@ interface PortfolioState {
   reset: () => void;
 
   // Account actions
-  addAccount: (data: { name: string; broker: BrokerName; accountType: AccountType }, supabase: SupabaseClient, userId: string) => Promise<string>;
+  addAccount: (data: { name: string; broker: BrokerName; accountType: AccountType; cashBalance?: number }, supabase: SupabaseClient, userId: string) => Promise<string>;
   updateAccount: (id: string, updates: Partial<Omit<BrokerAccount, 'id' | 'createdAt'>>, supabase: SupabaseClient) => Promise<void>;
   deleteAccount: (id: string, supabase: SupabaseClient) => Promise<void>;
 
@@ -76,6 +76,7 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
       name: r.name,
       broker: r.broker as BrokerName,
       accountType: r.type as AccountType,
+      cashBalance: r.cash_balance ?? 0,
       createdAt: r.created_at,
     }));
 
@@ -90,7 +91,13 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
     }));
 
     const watchlistSymbols = watchlistRes.data?.map((r) => r.symbol) ?? [];
-    const watchlist = watchlistSymbols.length > 0 ? watchlistSymbols : DEFAULT_WATCHLIST;
+    // Fallback priority: saved watchlist → user's own portfolio tickers → default list
+    const portfolioTickers = [...new Set((positionsRes.data ?? []).map((r: { symbol: string }) => r.symbol))];
+    const watchlist = watchlistSymbols.length > 0
+      ? watchlistSymbols
+      : portfolioTickers.length > 0
+      ? portfolioTickers
+      : DEFAULT_WATCHLIST;
 
     const targetAllocations: Record<string, number> = {};
     (allocationsRes.data ?? []).forEach((r) => {
@@ -114,6 +121,7 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
       name: data.name,
       broker: data.broker,
       accountType: data.accountType,
+      cashBalance: data.cashBalance ?? 0,
       createdAt: new Date().toISOString(),
     };
     set((state) => ({ accounts: [...state.accounts, newAccount] }));
@@ -123,6 +131,7 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
       name: data.name,
       broker: data.broker,
       type: data.accountType,
+      cash_balance: data.cashBalance ?? 0,
     });
     return id;
   },
@@ -135,6 +144,7 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
     if (updates.name) dbUpdates.name = updates.name;
     if (updates.broker) dbUpdates.broker = updates.broker;
     if (updates.accountType) dbUpdates.type = updates.accountType;
+    if (updates.cashBalance !== undefined) dbUpdates.cash_balance = updates.cashBalance;
     dbUpdates.updated_at = new Date().toISOString();
     await supabase.from('accounts').update(dbUpdates).eq('id', id);
   },

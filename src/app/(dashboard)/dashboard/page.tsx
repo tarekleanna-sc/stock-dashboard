@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -8,11 +9,26 @@ import { AllocationBar } from '@/components/ui/AllocationBar';
 import { StockLogo } from '@/components/ui/StockLogo';
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { usePortfolioValue } from '@/hooks/usePortfolioValue';
+import { useAutoSnapshot } from '@/hooks/useAutoSnapshot';
 import { useStockLogos } from '@/hooks/useStockLogos';
 import { formatCurrency } from '@/lib/utils/formatting';
 import { calculateAllocation } from '@/lib/utils/calculations';
 import { CHART_COLORS } from '@/lib/utils/constants';
 import { ACCOUNT_TYPE_LABELS } from '@/types/portfolio';
+
+function useLastUpdated(dataUpdatedAt: number): string {
+  return useMemo(() => {
+    if (!dataUpdatedAt) return '';
+    const diffMs = Date.now() - dataUpdatedAt;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin === 1) return '1 min ago';
+    if (diffMin < 60) return `${diffMin} min ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    return diffHr === 1 ? '1 hr ago' : `${diffHr} hr ago`;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataUpdatedAt]);
+}
 
 const container = {
   hidden: { opacity: 0 },
@@ -25,7 +41,12 @@ const item = {
 
 export default function DashboardPage() {
   const { accounts, positions } = usePortfolioStore();
-  const { enrichedPositions, totalValue, totalCostBasis, isLoading } = usePortfolioValue();
+  const { enrichedPositions, totalValue, totalCostBasis, isLoading, refetch, dataUpdatedAt } = usePortfolioValue();
+
+  // Auto-capture daily snapshot
+  useAutoSnapshot(totalValue, isLoading);
+
+  const lastUpdatedLabel = useLastUpdated(dataUpdatedAt ?? 0);
 
   const totalGainLoss = totalValue - totalCostBasis;
   const totalGainLossPercent = totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
@@ -35,6 +56,52 @@ export default function DashboardPage() {
 
   const allTickers = Array.from(new Set(positions.map((p) => p.ticker)));
   const logos = useStockLogos(allTickers);
+
+  // Holdings search + sort state
+  const [holdingsSearch, setHoldingsSearch] = useState('');
+  const [sortKey, setSortKey] = useState<'marketValue' | 'gainLossPercent' | 'ticker'>('marketValue');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const displayHoldings = useMemo(() => {
+    // Enrich allocation with gain/loss data from enrichedPositions
+    let items = sortedAllocation.map((h) => {
+      const pos = enrichedPositions.find((p) => p.ticker === h.ticker);
+      return {
+        ...h,
+        gainLossPercent: pos?.gainLossPercent ?? 0,
+        dayChangePercent: pos?.dayChangePercent ?? 0,
+      };
+    });
+
+    // Filter by search
+    if (holdingsSearch.trim()) {
+      const q = holdingsSearch.toLowerCase();
+      items = items.filter(
+        (h) =>
+          h.ticker.toLowerCase().includes(q) ||
+          h.companyName.toLowerCase().includes(q)
+      );
+    }
+
+    // Sort
+    items.sort((a, b) => {
+      let diff = 0;
+      if (sortKey === 'ticker') diff = a.ticker.localeCompare(b.ticker);
+      else diff = a[sortKey] - b[sortKey];
+      return sortDir === 'desc' ? -diff : diff;
+    });
+
+    return items;
+  }, [sortedAllocation, enrichedPositions, holdingsSearch, sortKey, sortDir]);
+
+  function toggleSort(key: typeof sortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'));
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  }
 
   // Allocation bar segments
   const barSegments = sortedAllocation.slice(0, 8).map((a, i) => ({
@@ -102,15 +169,46 @@ export default function DashboardPage() {
             {positions.length} positions &middot; {accounts.length} accounts
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-2xl font-bold text-white">
-            {isLoading ? '—' : formatCurrency(totalValue)}
-          </p>
-          {!isLoading && (
-            <p className={`text-sm font-medium mt-0.5 ${totalGainLoss >= 0 ? 'text-green-400' : 'text-rose-400'}`}>
-              {totalGainLoss >= 0 ? '+' : ''}{formatCurrency(totalGainLoss)} open P&L
+        <div className="flex flex-col items-end gap-1">
+          <div className="text-right">
+            <p className="text-2xl font-bold text-white">
+              {isLoading ? '—' : formatCurrency(totalValue)}
             </p>
-          )}
+            {!isLoading && (
+              <p className={`text-sm font-medium mt-0.5 ${totalGainLoss >= 0 ? 'text-green-400' : 'text-rose-400'}`}>
+                {totalGainLoss >= 0 ? '+' : ''}{formatCurrency(totalGainLoss)} open P&L
+              </p>
+            )}
+          </div>
+          {/* Refresh button + last updated */}
+          <div className="flex items-center gap-2 mt-1">
+            {lastUpdatedLabel && (
+              <span className="text-xs text-white/25">Updated {lastUpdatedLabel}</span>
+            )}
+            <button
+              onClick={() => refetch?.()}
+              disabled={isLoading}
+              title="Refresh prices"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-all disabled:opacity-40"
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={isLoading ? 'animate-spin' : ''}
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+              </svg>
+              Refresh
+            </button>
+          </div>
         </div>
       </motion.div>
 
@@ -194,14 +292,56 @@ export default function DashboardPage() {
 
         {/* Holdings */}
         <motion.div variants={item}>
-          <p className="text-[11px] font-semibold tracking-[0.15em] text-white/30 uppercase mb-3 px-1">
-            Holdings
-          </p>
+          {/* Header row with search + sort */}
+          <div className="flex items-center gap-2 mb-3 px-1 flex-wrap">
+            <p className="text-[11px] font-semibold tracking-[0.15em] text-white/30 uppercase flex-1">
+              Holdings
+              {holdingsSearch && (
+                <span className="ml-2 text-cyan-400/60 normal-case tracking-normal text-[10px]">
+                  ({displayHoldings.length} of {sortedAllocation.length})
+                </span>
+              )}
+            </p>
+
+            {/* Sort pills */}
+            <div className="flex items-center gap-1">
+              {(['marketValue', 'gainLossPercent', 'ticker'] as const).map((key) => (
+                <button
+                  key={key}
+                  onClick={() => toggleSort(key)}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-medium transition-all flex items-center gap-0.5 ${
+                    sortKey === key
+                      ? 'bg-cyan-500/15 text-cyan-400'
+                      : 'text-white/30 hover:text-white/60 hover:bg-white/[0.05]'
+                  }`}
+                >
+                  {key === 'marketValue' ? 'Value' : key === 'gainLossPercent' ? 'Gain%' : 'A-Z'}
+                  {sortKey === key && (
+                    <span>{sortDir === 'desc' ? ' ↓' : ' ↑'}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Search input */}
+            <input
+              type="text"
+              value={holdingsSearch}
+              onChange={(e) => setHoldingsSearch(e.target.value)}
+              placeholder="Search…"
+              className="bg-white/[0.05] border border-white/[0.08] rounded-lg px-2.5 py-1 text-xs text-white/70 placeholder:text-white/20 outline-none w-24 focus:w-36 focus:border-white/20 transition-all duration-200"
+            />
+          </div>
+
           <GlassCard padding="none">
             <div className="divide-y divide-white/[0.05]">
-              {sortedAllocation.map((holding, i) => {
-                const pos = enrichedPositions.find((p) => p.ticker === holding.ticker);
-                const gainLossPercent = pos?.gainLossPercent ?? 0;
+              {displayHoldings.length === 0 && (
+                <div className="py-8 text-center text-sm text-white/30">
+                  No holdings match &ldquo;{holdingsSearch}&rdquo;
+                </div>
+              )}
+              {displayHoldings.map((holding, i) => {
+                const gainLossPercent = holding.gainLossPercent;
                 const isPositive = gainLossPercent >= 0;
 
                 return (
@@ -282,7 +422,7 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-white group-hover:text-violet-400 transition-colors">Rebalance</p>
-                  <p className="text-xs text-white/40">Optimize your allocation</p>
+                  <p className="text-xs text-white/40">Target allocations & drift</p>
                 </div>
               </div>
             </GlassCard>
