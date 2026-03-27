@@ -303,7 +303,7 @@ export default function EarningsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Earnings Calendar"
-        subtitle="Track upcoming earnings for your holdings and the broader market"
+        description="Track upcoming earnings for your holdings and the broader market"
       />
 
       {/* Summary stats */}

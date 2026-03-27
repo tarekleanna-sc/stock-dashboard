@@ -267,7 +267,7 @@ export default function CorrelationPage() {
     <div className="space-y-6">
       <PageHeader
         title="Correlation Matrix"
-        subtitle="How your holdings move together — identifies concentration risk and natural hedges"
+        description="How your holdings move together — identifies concentration risk and natural hedges"
       />
 
       {/* Summary */}

@@ -275,7 +275,7 @@ export default function AdminDashboard() {
               ) : (
                 <ResponsiveContainer width="100%" height={180}>
                   <PieChart>
-                    <Pie data={planPieData} cx="50%" cy="45%" outerRadius={64} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={10}>
+                    <Pie data={planPieData} cx="50%" cy="45%" outerRadius={64} dataKey="value" label={false} labelLine={false} fontSize={10}>
                       {planPieData.map((entry, i) => (
                         <Cell key={i} fill={entry.color} />
                       ))}

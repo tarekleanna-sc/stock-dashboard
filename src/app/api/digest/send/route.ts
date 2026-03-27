@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/service';
+import { createServiceClient } from '@/lib/supabase/service';
 
 /**
  * POST /api/digest/send
@@ -199,7 +199,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Verify user owns this userId using service client
-  const supabase = createClient();
+  const supabase = createServiceClient();
   const { data: { user }, error: authError } = await supabase.auth.admin.getUserById(body.userId);
   if (authError || !user || user.email !== body.toEmail) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });

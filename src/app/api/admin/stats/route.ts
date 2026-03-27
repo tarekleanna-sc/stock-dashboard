@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/service';
+import { createServiceClient } from '@/lib/supabase/service';
 
 /**
  * GET /api/admin/stats
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient();
+  const supabase = createServiceClient();
 
   // Fetch subscriptions
   const { data: subs, error: subErr } = await supabase
@@ -37,7 +37,8 @@ export async function GET(req: NextRequest) {
   const { data: { users }, error: usersErr } = await supabase.auth.admin.listUsers({ perPage: 1000 });
   const totalUsers = usersErr ? null : users?.length ?? 0;
 
-  const activeSubs = (subs ?? []).filter(s => s.status === 'active');
+  type SubRow = { plan: string; status: string; created_at: string; user_id: string };
+  const activeSubs = (subs ?? [] as SubRow[]).filter((s: SubRow) => s.status === 'active');
 
   // Plan distribution
   const planCounts: Record<string, number> = { free: 0, pro: 0, advisor: 0 };
@@ -46,24 +47,24 @@ export async function GET(req: NextRequest) {
   }
 
   // Users without a subscription row (or free plan) are free users
-  const paidSubs = activeSubs.filter(s => s.plan !== 'free');
+  const paidSubs = activeSubs.filter((s: SubRow) => s.plan !== 'free');
 
   // MRR
-  const mrr = paidSubs.reduce((sum, s) => sum + (PLAN_PRICES[s.plan] ?? 0), 0);
+  const mrr = paidSubs.reduce((sum: number, s: SubRow) => sum + (PLAN_PRICES[s.plan] ?? 0), 0);
   const arr = mrr * 12;
 
   // New subscribers last 30 days
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const newSubs30d = activeSubs.filter(s => new Date(s.created_at) > thirtyDaysAgo).length;
+  const newSubs30d = activeSubs.filter((s: SubRow) => new Date(s.created_at) > thirtyDaysAgo).length;
 
   // Churn: canceled subscriptions
-  const canceledSubs = (subs ?? []).filter(s => s.status === 'canceled');
-  const newCanceled30d = canceledSubs.filter(s => new Date(s.created_at) > thirtyDaysAgo).length;
+  const canceledSubs = (subs ?? [] as SubRow[]).filter((s: SubRow) => s.status === 'canceled');
+  const newCanceled30d = canceledSubs.filter((s: SubRow) => new Date(s.created_at) > thirtyDaysAgo).length;
 
   // New users last 30d
   const newUsers30d = users
-    ? users.filter(u => new Date(u.created_at) > thirtyDaysAgo).length
+    ? users.filter((u: { created_at: string }) => new Date(u.created_at) > thirtyDaysAgo).length
     : null;
 
   // Users by signup date for chart (last 30 days)

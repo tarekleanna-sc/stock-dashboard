@@ -198,7 +198,7 @@ export default function MonteCarloPage() {
     <div className="space-y-6">
       <PageHeader
         title="Monte Carlo Simulation"
-        subtitle="Probabilistic portfolio projections based on expected returns and volatility"
+        description="Probabilistic portfolio projections based on expected returns and volatility"
       />
 
       {/* Parameter controls */}

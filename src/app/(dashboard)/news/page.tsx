@@ -185,7 +185,7 @@ export default function NewsPage() {
     <div className="space-y-6">
       <PageHeader
         title="News Feed"
-        subtitle="Latest headlines for your holdings and the broader market"
+        description="Latest headlines for your holdings and the broader market"
       />
 
       {/* Ticker filter */}
