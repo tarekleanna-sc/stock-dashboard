@@ -83,6 +83,16 @@ const navItems = [
     ),
   },
   {
+    name: 'News',
+    href: '/news',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2" />
+        <path d="M16 13h-4M16 17h-4M10 13h.01M10 17h.01" />
+      </svg>
+    ),
+  },
+  {
     name: 'Earnings',
     href: '/earnings',
     icon: (
