@@ -170,6 +170,16 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    name: 'Branding',
+    href: '/settings/branding',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14" />
+      </svg>
+    ),
+  },
 ];
 
 export default function Sidebar({ userEmail }: { userEmail: string }) {

@@ -71,6 +71,7 @@ const ALL_NAV = [
   { name: 'Clients', href: '/clients' },
   { name: 'Billing', href: '/billing' },
   { name: 'Attribution', href: '/performance-attribution' },
+  { name: 'Branding', href: '/settings/branding' },
 ];
 
 export default function MobileNav() {
