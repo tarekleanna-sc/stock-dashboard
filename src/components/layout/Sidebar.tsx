@@ -153,7 +153,7 @@ export default function Sidebar({ userEmail }: { userEmail: string }) {
 
   return (
     <aside
-      className={`fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-white/[0.08] bg-[#0d0d2b]/80 py-5 backdrop-blur-xl transition-[width] duration-200 ease-in-out overflow-hidden ${
+      className={`fixed left-0 top-0 z-40 hidden md:flex h-screen flex-col border-r border-white/[0.08] bg-[#0d0d2b]/80 py-5 backdrop-blur-xl transition-[width] duration-200 ease-in-out overflow-hidden ${
         expanded ? 'w-52' : 'w-16'
       }`}
     >
