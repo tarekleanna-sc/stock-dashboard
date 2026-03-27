@@ -7,6 +7,11 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { BrokerAccount } from '@/types/portfolio';
+import {
+  BROKER_PRESETS,
+  PRESET_OPTIONS,
+  BrokerPresetId,
+} from '@/lib/utils/brokerPresets';
 
 // ─── CSV Parser ───────────────────────────────────────────────────────────────
 
@@ -20,13 +25,13 @@ function parseCSVRow(row: string): string[] {
       if (inQuotes && row[i + 1] === '"') { current += '"'; i++; }
       else inQuotes = !inQuotes;
     } else if (ch === ',' && !inQuotes) {
-      result.push(current.trim().replace(/^\$/, ''));
+      result.push(current.trim().replace(/^\$/, '').replace(/,/g, ''));
       current = '';
     } else {
       current += ch;
     }
   }
-  result.push(current.trim().replace(/^\$/, ''));
+  result.push(current.trim().replace(/^\$/, '').replace(/,/g, ''));
   return result;
 }
 
@@ -42,13 +47,14 @@ function parseCSV(text: string): { headers: string[]; rows: string[][] } {
 
 const SYMBOL_PATTERNS = /^(symbol|ticker|stock|security|description|instrument)$/i;
 const SHARES_PATTERNS = /^(quantity|shares|qty|units|amount|position)$/i;
-const COST_PATTERNS = /^(average.?cost|avg.?cost|cost.?basis|cost.?per.?share|purchase.?price|average.?price|avg.?price|unit.?cost)$/i;
+const COST_PATTERNS = /^(average.?cost|avg.?cost|cost.?basis|cost.?per.?share|purchase.?price|average.?price|avg.?price|unit.?cost|price.?paid)$/i;
 
 function autoDetectColumns(headers: string[]) {
   return {
     symbolCol: headers.find(h => SYMBOL_PATTERNS.test(h.trim())) ?? '',
     sharesCol: headers.find(h => SHARES_PATTERNS.test(h.trim())) ?? '',
     costCol:   headers.find(h => COST_PATTERNS.test(h.trim())) ?? '',
+    costIsTotal: false,
   };
 }
 
@@ -82,6 +88,9 @@ export default function CSVImportModal({ isOpen, onClose, accounts }: Props) {
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState('');
 
+  // Broker preset selection
+  const [selectedPreset, setSelectedPreset] = useState<BrokerPresetId>('generic');
+
   // Parsed CSV state
   const [headers, setHeaders] = useState<string[]>([]);
   const [rawRows, setRawRows] = useState<string[][]>([]);
@@ -90,6 +99,7 @@ export default function CSVImportModal({ isOpen, onClose, accounts }: Props) {
   const [symbolCol, setSymbolCol] = useState('');
   const [sharesCol, setSharesCol] = useState('');
   const [costCol,   setCostCol]   = useState('');
+  const [costIsTotal, setCostIsTotal] = useState(false);
   const [targetAccountId, setTargetAccountId] = useState(accounts[0]?.id ?? '');
 
   // Preview state
@@ -109,12 +119,39 @@ export default function CSVImportModal({ isOpen, onClose, accounts }: Props) {
     setSymbolCol('');
     setSharesCol('');
     setCostCol('');
+    setCostIsTotal(false);
     setImportedCount(0);
+    setSelectedPreset('generic');
   }
 
   function handleClose() {
     reset();
     onClose();
+  }
+
+  // Apply a broker preset's column mapping to currently loaded headers
+  function applyPreset(presetId: BrokerPresetId, currentHeaders: string[]) {
+    const preset = BROKER_PRESETS[presetId];
+    if (presetId === 'generic') {
+      // Auto-detect
+      const detected = autoDetectColumns(currentHeaders);
+      setSymbolCol(detected.symbolCol);
+      setSharesCol(detected.sharesCol);
+      setCostCol(detected.costCol);
+      setCostIsTotal(false);
+    } else {
+      // Use preset's known column names — fall back to auto-detect if not found
+      const sym = currentHeaders.includes(preset.symbolCol) ? preset.symbolCol
+        : currentHeaders.find(h => SYMBOL_PATTERNS.test(h.trim())) ?? '';
+      const shr = currentHeaders.includes(preset.sharesCol) ? preset.sharesCol
+        : currentHeaders.find(h => SHARES_PATTERNS.test(h.trim())) ?? '';
+      const cst = currentHeaders.includes(preset.costCol) ? preset.costCol
+        : currentHeaders.find(h => COST_PATTERNS.test(h.trim())) ?? '';
+      setSymbolCol(sym);
+      setSharesCol(shr);
+      setCostCol(cst);
+      setCostIsTotal(preset.costIsTotal ?? false);
+    }
   }
 
   // ── File ingestion ──────────────────────────────────────────────────────────
@@ -132,10 +169,7 @@ export default function CSVImportModal({ isOpen, onClose, accounts }: Props) {
       if (h.length === 0) { alert('Could not parse CSV — make sure it has headers.'); return; }
       setHeaders(h);
       setRawRows(r);
-      const detected = autoDetectColumns(h);
-      setSymbolCol(detected.symbolCol);
-      setSharesCol(detected.sharesCol);
-      setCostCol(detected.costCol);
+      applyPreset(selectedPreset, h);
       if (accounts.length > 0) setTargetAccountId(accounts[0].id);
       setStep('map');
     };
@@ -153,7 +187,7 @@ export default function CSVImportModal({ isOpen, onClose, accounts }: Props) {
     const f = e.dataTransfer.files[0];
     if (f) ingestFile(f);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedPreset]);
 
   // ── Build preview rows from mapping ────────────────────────────────────────
 
@@ -169,16 +203,23 @@ export default function CSVImportModal({ isOpen, onClose, accounts }: Props) {
         const costRaw   = cstIdx >= 0 ? row[cstIdx]?.trim().replace(/,/g, '') : '';
 
         const shares   = parseFloat(sharesRaw);
-        const costBasis = parseFloat(costRaw);
-        const errors: string[] = [];
+        let costBasis = parseFloat(costRaw);
+        if (!isNaN(costBasis) && !isNaN(shares) && shares > 0 && costIsTotal) {
+          costBasis = costBasis / shares;
+        }
 
-        if (!symbol)            errors.push('Missing symbol');
-        if (isNaN(shares) || shares <= 0) errors.push('Invalid shares');
+        const errors: string[] = [];
+        if (!symbol)                            errors.push('Missing symbol');
+        if (isNaN(shares) || shares <= 0)       errors.push('Invalid shares');
         if (isNaN(costBasis) || costBasis <= 0) errors.push('Invalid cost basis');
+
+        // Skip rows where the symbol looks like a header, total line, or cash
+        const skipSymbols = /^(pending|cash|total|subtotal|--)$/i;
+        if (symbol && skipSymbols.test(symbol)) errors.push('Skipped row');
 
         return { id: i, symbol, shares, costBasis, isValid: errors.length === 0, errors, selected: errors.length === 0 };
       })
-      .filter((r) => r.symbol || r.shares || r.costBasis); // skip blank rows
+      .filter((r) => r.symbol || r.shares || r.costBasis);
 
     setPreviewRows(rows);
     setStep('preview');
@@ -218,18 +259,43 @@ export default function CSVImportModal({ isOpen, onClose, accounts }: Props) {
 
   const selectedCount = previewRows.filter((r) => r.selected && r.isValid).length;
   const validCount    = previewRows.filter((r) => r.isValid).length;
+  const preset = BROKER_PRESETS[selectedPreset];
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <GlassModal isOpen={isOpen} onClose={handleClose} title="Import Positions from CSV">
+
       {/* ── Step 1: Upload ── */}
       {step === 'upload' && (
         <div className="space-y-5">
-          <p className="text-sm text-white/60">
-            Upload a CSV export from your broker. Supported: Fidelity, Schwab, Robinhood,
-            TD Ameritrade, IBKR, or any CSV with Symbol / Shares / Cost columns.
-          </p>
+          {/* Broker Preset Selector */}
+          <div>
+            <label className="block text-xs font-medium text-white/60 mb-2">Select your broker for automatic column detection</label>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              {PRESET_OPTIONS.slice(0, 8).map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setSelectedPreset(opt.value as BrokerPresetId)}
+                  className={`rounded-xl border px-3 py-2 text-xs font-medium transition-all text-left ${
+                    selectedPreset === opt.value
+                      ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-400'
+                      : 'border-white/[0.08] bg-white/[0.03] text-white/50 hover:text-white/80 hover:border-white/20'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Instructions for selected broker */}
+          {selectedPreset !== 'generic' && (
+            <GlassCard padding="sm" className="bg-cyan-500/[0.03] border-cyan-500/10">
+              <p className="text-xs text-cyan-300/70 leading-relaxed">{preset.exportInstructions}</p>
+              <p className="text-[11px] text-white/30 mt-1.5">Expected columns: <span className="text-white/50">{preset.columnHint}</span></p>
+            </GlassCard>
+          )}
 
           {/* Dropzone */}
           <div
@@ -237,7 +303,7 @@ export default function CSVImportModal({ isOpen, onClose, accounts }: Props) {
             onDragLeave={() => setDragging(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed py-12 cursor-pointer transition-all ${
+            className={`flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed py-10 cursor-pointer transition-all ${
               dragging
                 ? 'border-cyan-400/60 bg-cyan-500/10'
                 : 'border-white/10 hover:border-white/25 hover:bg-white/[0.03]'
@@ -254,25 +320,6 @@ export default function CSVImportModal({ isOpen, onClose, accounts }: Props) {
             </div>
             <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
           </div>
-
-          {/* Format hint */}
-          <GlassCard padding="sm" className="bg-white/[0.02]">
-            <p className="text-xs text-white/40 font-medium mb-2">Expected CSV format (any of these column names work):</p>
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <div>
-                <p className="text-white/60 font-semibold mb-1">Symbol</p>
-                <p className="text-white/30">Symbol, Ticker, Security</p>
-              </div>
-              <div>
-                <p className="text-white/60 font-semibold mb-1">Shares</p>
-                <p className="text-white/30">Quantity, Shares, Qty</p>
-              </div>
-              <div>
-                <p className="text-white/60 font-semibold mb-1">Cost Basis</p>
-                <p className="text-white/30">Average Cost, Cost Basis, Avg Price</p>
-              </div>
-            </div>
-          </GlassCard>
         </div>
       )}
 
@@ -283,16 +330,31 @@ export default function CSVImportModal({ isOpen, onClose, accounts }: Props) {
             <div className="w-2 h-2 rounded-full bg-cyan-400" />
             <p className="text-sm text-white/70">
               Found <span className="text-white font-semibold">{rawRows.length}</span> rows in{' '}
-              <span className="text-cyan-400">{fileName}</span>. Map the columns below.
+              <span className="text-cyan-400">{fileName}</span>
+              {selectedPreset !== 'generic' && (
+                <span className="text-white/40"> · {preset.label} preset applied</span>
+              )}
             </p>
           </div>
+
+          {/* Cost is total notice */}
+          {costIsTotal && (
+            <div className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/[0.07] px-3 py-2.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <p className="text-xs text-amber-400/80">
+                <span className="font-semibold">Schwab mode:</span> Cost column is total basis — dividing by quantity to get per-share cost automatically.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-3">
             {(
               [
                 { label: 'Symbol Column', value: symbolCol, set: setSymbolCol, required: true },
                 { label: 'Shares Column', value: sharesCol, set: setSharesCol, required: true },
-                { label: 'Cost Basis per Share Column', value: costCol, set: setCostCol, required: true },
+                { label: `Cost ${costIsTotal ? '(Total — auto ÷ shares)' : 'Per Share'} Column`, value: costCol, set: setCostCol, required: true },
               ] as const
             ).map(({ label, value, set, required }) => (
               <div key={label}>
@@ -311,6 +373,19 @@ export default function CSVImportModal({ isOpen, onClose, accounts }: Props) {
                 </select>
               </div>
             ))}
+
+            {/* Cost is total toggle */}
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={costIsTotal}
+                  onChange={(e) => setCostIsTotal(e.target.checked)}
+                  className="accent-cyan-400 w-4 h-4"
+                />
+                <span className="text-xs text-white/50">Cost column is total basis (will divide by shares)</span>
+              </label>
+            </div>
 
             <div>
               <label className="block text-xs font-medium text-white/60 mb-1">
@@ -370,7 +445,7 @@ export default function CSVImportModal({ isOpen, onClose, accounts }: Props) {
                   </th>
                   <th className="py-2 px-2 text-left text-xs text-white/40 font-medium">Symbol</th>
                   <th className="py-2 px-2 text-right text-xs text-white/40 font-medium">Shares</th>
-                  <th className="py-2 px-2 text-right text-xs text-white/40 font-medium">Avg Cost</th>
+                  <th className="py-2 px-2 text-right text-xs text-white/40 font-medium">Avg Cost/Share</th>
                   <th className="py-2 pl-2 pr-3 text-left text-xs text-white/40 font-medium">Status</th>
                 </tr>
               </thead>
