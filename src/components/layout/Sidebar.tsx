@@ -83,6 +83,18 @@ const navItems = [
     ),
   },
   {
+    name: 'Monte Carlo',
+    href: '/monte-carlo',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 12C2 12 5 5 12 5s10 7 10 7-3 7-10 7S2 12 2 12z" />
+        <path d="M8 12a4 4 0 0 0 4 4" strokeDasharray="2 2" />
+        <path d="M8 12a4 4 0 0 1 4-4" />
+        <circle cx="12" cy="12" r="1" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
     name: 'News',
     href: '/news',
     icon: (
