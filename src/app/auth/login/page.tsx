@@ -1,21 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
 
 type Mode = 'signin' | 'signup';
 
-export default function LoginPage() {
+function LoginPageInner() {
   const { supabase } = useSupabase();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Capture referral code from URL param
+  const refCode = searchParams.get('ref');
+
+  useEffect(() => {
+    // If there's a ref code, switch to signup mode to encourage registration
+    if (refCode) {
+      setMode('signup');
+    }
+  }, [refCode]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,10 +35,20 @@ export default function LoginPage() {
     setSuccessMsg('');
 
     if (mode === 'signup') {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) {
         setError(error.message);
       } else {
+        // If signed up via referral, track it immediately
+        if (refCode && data.user) {
+          try {
+            await fetch('/api/referral/track', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: refCode }),
+            });
+          } catch { /* non-blocking */ }
+        }
         setSuccessMsg('Check your email for a confirmation link, then sign in.');
         setMode('signin');
       }
@@ -141,10 +162,24 @@ export default function LoginPage() {
           </form>
         </div>
 
+        {refCode && mode === 'signup' && (
+          <p className="mt-3 text-center text-xs text-emerald-400/70">
+            🎁 Referral code <span className="font-mono font-semibold">{refCode}</span> will be applied on signup
+          </p>
+        )}
+
         <p className="mt-5 text-center text-xs text-white/25">
           No credit card required · Free plan available
         </p>
       </motion.div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#08090e]" />}>
+      <LoginPageInner />
+    </Suspense>
   );
 }

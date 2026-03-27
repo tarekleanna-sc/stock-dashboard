@@ -72,6 +72,7 @@ const ALL_NAV = [
   { name: 'Billing', href: '/billing' },
   { name: 'Attribution', href: '/performance-attribution' },
   { name: 'Tax Lots', href: '/tax-lots' },
+  { name: 'Referrals', href: '/referrals' },
   { name: 'Settings', href: '/settings/branding' },
 ];
 
