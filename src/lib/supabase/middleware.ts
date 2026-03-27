@@ -43,10 +43,11 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Authenticated user hitting auth pages → redirect to dashboard
+  // Authenticated user hitting auth pages → redirect to onboarding or dashboard
   if (user && pathname.startsWith('/auth')) {
+    const onboardingComplete = user.user_metadata?.onboarding_completed === true
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    url.pathname = onboardingComplete ? '/dashboard' : '/onboarding'
     return NextResponse.redirect(url)
   }
 

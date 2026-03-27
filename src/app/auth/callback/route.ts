@@ -9,7 +9,11 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(`${origin}/dashboard`)
+      // Check if this user has completed onboarding
+      const { data: { user } } = await supabase.auth.getUser()
+      const onboardingComplete = user?.user_metadata?.onboarding_completed === true
+      const destination = onboardingComplete ? '/dashboard' : '/onboarding'
+      return NextResponse.redirect(`${origin}${destination}`)
     }
   }
 
