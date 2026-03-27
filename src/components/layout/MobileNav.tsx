@@ -70,6 +70,7 @@ const ALL_NAV = [
   { name: 'Mock Builder', href: '/mock-builder' },
   { name: 'Clients', href: '/clients' },
   { name: 'Billing', href: '/billing' },
+  { name: 'Attribution', href: '/performance-attribution' },
 ];
 
 export default function MobileNav() {
