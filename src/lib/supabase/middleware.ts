@@ -32,8 +32,12 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // Public routes accessible without auth
+  const publicRoutes = ['/', '/pricing', '/features']
+  const isPublicRoute = publicRoutes.includes(pathname)
+
   // Unauthenticated user hitting a protected route → redirect to login
-  if (!user && !pathname.startsWith('/auth')) {
+  if (!user && !pathname.startsWith('/auth') && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     return NextResponse.redirect(url)
@@ -41,6 +45,13 @@ export async function updateSession(request: NextRequest) {
 
   // Authenticated user hitting auth pages → redirect to dashboard
   if (user && pathname.startsWith('/auth')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
+  }
+
+  // Authenticated user hitting public marketing pages → redirect to dashboard
+  if (user && isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
