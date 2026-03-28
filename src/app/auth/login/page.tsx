@@ -23,9 +23,7 @@ function LoginPageInner() {
 
   useEffect(() => {
     // If there's a ref code, switch to signup mode to encourage registration
-    if (refCode) {
-      setMode('signup');
-    }
+    if (refCode) setMode('signup');
   }, [refCode]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -34,36 +32,50 @@ function LoginPageInner() {
     setError('');
     setSuccessMsg('');
 
-    if (mode === 'signup') {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) {
-        setError(error.message);
-      } else {
-        // If signed up via referral, track it immediately
-        if (refCode && data.user) {
-          try {
-            await fetch('/api/referral/track', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code: refCode }),
-            });
-          } catch { /* non-blocking */ }
+    try {
+      if (mode === 'signup') {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) {
+          setError(error.message);
+        } else if (data.session) {
+          // Email confirmation is OFF — user is immediately signed in.
+          // onAuthStateChange in SupabaseProvider will handle the redirect.
+        } else {
+          // Email confirmation is ON — ask user to check their inbox.
+          if (refCode && data.user) {
+            try {
+              await fetch('/api/referral/track', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: refCode }),
+              });
+            } catch { /* non-blocking */ }
+          }
+          setSuccessMsg('Account created! Check your email for a confirmation link, then sign in.');
+          setMode('signin');
         }
-        setSuccessMsg('Check your email for a confirmation link, then sign in.');
-        setMode('signin');
-      }
-    } else {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        setError(error.message);
       } else {
-        // Route new users to onboarding, returning users to dashboard
-        const onboardingComplete = data.user?.user_metadata?.onboarding_completed === true;
-        router.push(onboardingComplete ? '/dashboard' : '/onboarding');
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          setError(error.message);
+        } else {
+          // onAuthStateChange in SupabaseProvider handles routing (checks onboarding).
+          // Fallback push in case the event is slow.
+          const onboardingComplete = data.user?.user_metadata?.onboarding_completed === true;
+          router.push(onboardingComplete ? '/dashboard' : '/onboarding');
+        }
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
     }
+  }
 
-    setLoading(false);
+  function switchMode(m: Mode) {
+    setMode(m);
+    setError('');
+    setSuccessMsg('');
   }
 
   return (
@@ -90,23 +102,25 @@ function LoginPageInner() {
           <div className="text-center">
             <h1 className="text-2xl font-bold text-white">StockDash</h1>
             <p className="mt-1 text-sm text-white/40">
-              {mode === 'signin' ? 'Sign in to your account' : 'Create your free account'}
+              {mode === 'signin' ? 'Welcome back — sign in to continue' : 'Create your free account'}
             </p>
           </div>
         </div>
 
         {/* Card */}
         <div className="rounded-2xl border border-white/[0.09] bg-white/[0.05] p-8 shadow-[0_24px_80px_rgba(0,0,0,0.4)] backdrop-blur-2xl">
+
           {/* Mode tabs */}
           <div className="mb-6 flex rounded-xl bg-white/[0.04] p-1">
             {(['signin', 'signup'] as Mode[]).map((m) => (
               <button
                 key={m}
-                onClick={() => { setMode(m); setError(''); setSuccessMsg(''); }}
-                className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-all ${
+                type="button"
+                onClick={() => switchMode(m)}
+                className={`flex-1 rounded-lg py-2.5 text-xs font-semibold transition-all ${
                   mode === m
                     ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/25'
-                    : 'text-white/40 hover:text-white/60'
+                    : 'text-white/50 hover:text-white/75'
                 }`}
               >
                 {m === 'signin' ? 'Sign in' : 'Create account'}
@@ -156,10 +170,37 @@ function LoginPageInner() {
               className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading
-                ? mode === 'signin' ? 'Signing in…' : 'Creating account…'
-                : mode === 'signin' ? 'Sign in' : 'Create free account'}
+                ? (mode === 'signin' ? 'Signing in…' : 'Creating account…')
+                : (mode === 'signin' ? 'Sign in' : 'Create free account')}
             </button>
           </form>
+
+          {/* Inline mode-switch prompt */}
+          <p className="mt-5 text-center text-xs text-white/35">
+            {mode === 'signin' ? (
+              <>
+                Don&apos;t have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => switchMode('signup')}
+                  className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+                >
+                  Create one free
+                </button>
+              </>
+            ) : (
+              <>
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => switchMode('signin')}
+                  className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+                >
+                  Sign in →
+                </button>
+              </>
+            )}
+          </p>
         </div>
 
         {refCode && mode === 'signup' && (

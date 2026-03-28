@@ -42,7 +42,16 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
         if (event === 'SIGNED_IN' && currentUser) {
           await hydrate(supabase, currentUser.id);
-          router.push('/dashboard');
+          // Only redirect when on an auth page — the login form handles its own routing
+          // for sign-in; this catches cases like email-confirmation auto-login.
+          const isOnAuthPage = window.location.pathname.startsWith('/auth');
+          if (isOnAuthPage) {
+            const onboardingComplete = currentUser.user_metadata?.onboarding_completed === true;
+            router.push(onboardingComplete ? '/dashboard' : '/onboarding');
+          } else {
+            // Already inside the app — just refresh so server components see the new session.
+            router.refresh();
+          }
         }
         if (event === 'SIGNED_OUT') {
           reset();
