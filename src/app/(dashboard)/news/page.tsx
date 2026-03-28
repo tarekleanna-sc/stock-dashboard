@@ -5,8 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import PageHeader from '@/components/layout/PageHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GlassBadge } from '@/components/ui/GlassBadge';
+import { UpgradePrompt } from '@/components/ui/UpgradePrompt';
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useTickerNews, useMarketNews, timeAgo, NewsArticle } from '@/hooks/useStockNews';
+import { useSubscription } from '@/hooks/useSubscription';
+import { isPaid } from '@/lib/utils/featureGating';
 
 // ─── Article card ─────────────────────────────────────────────────────────────
 
@@ -173,6 +176,7 @@ function MarketNewsFeed() {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function NewsPage() {
+  const { plan, loading: subLoading } = useSubscription();
   const positions = usePortfolioStore((s) => s.positions);
   const [activeTicker, setActiveTicker] = useState<string | null>(null);
 
@@ -180,6 +184,19 @@ export default function NewsPage() {
     () => [...new Set(positions.map((p) => p.ticker))].slice(0, 20), // cap at 20 to avoid API spam
     [positions]
   );
+
+  if (!subLoading && !isPaid(plan)) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="News Feed" description="Latest headlines for your holdings and the broader market" />
+        <UpgradePrompt
+          title="Pro Feature: News Feed"
+          description="Get real-time news headlines for every stock in your portfolio, plus broader market news. Upgrade to Pro to unlock the live news feed."
+          requiredPlan="pro"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

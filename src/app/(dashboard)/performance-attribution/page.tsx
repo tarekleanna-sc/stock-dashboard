@@ -15,6 +15,10 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { usePortfolioValue } from '@/hooks/usePortfolioValue';
+import { useSubscription } from '@/hooks/useSubscription';
+import { canUseBenchmarks } from '@/lib/utils/featureGating';
+import PageHeader from '@/components/layout/PageHeader';
+import { UpgradePrompt } from '@/components/ui/UpgradePrompt';
 
 type Period = '1M' | '3M' | '6M' | '1Y';
 
@@ -71,6 +75,7 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
 }
 
 export default function PerformanceAttributionPage() {
+  const { plan, loading: subLoading } = useSubscription();
   const [period, setPeriod] = useState<Period>('1M');
   const { positions, totalValue, isLoading: positionsLoading } = usePortfolioValue();
 
@@ -186,6 +191,19 @@ export default function PerformanceAttributionPage() {
     if (isPercent) return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`;
     return `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   };
+
+  if (!subLoading && !canUseBenchmarks(plan)) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Performance Attribution" description="Which holdings drove your portfolio returns" />
+        <UpgradePrompt
+          title="Pro Feature: Performance Attribution"
+          description="See exactly which holdings drove your portfolio returns vs the SPY benchmark, with weight × return contribution analysis across multiple time periods."
+          requiredPlan="pro"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

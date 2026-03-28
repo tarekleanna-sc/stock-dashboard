@@ -5,8 +5,11 @@ import { useQueries } from '@tanstack/react-query';
 import PageHeader from '@/components/layout/PageHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GlassBadge } from '@/components/ui/GlassBadge';
+import { UpgradePrompt } from '@/components/ui/UpgradePrompt';
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { usePortfolioValue } from '@/hooks/usePortfolioValue';
+import { useSubscription } from '@/hooks/useSubscription';
+import { isPaid } from '@/lib/utils/featureGating';
 import type { HistoricalPrice } from '@/types/market';
 
 // ─── Correlation math ─────────────────────────────────────────────────────────
@@ -193,6 +196,7 @@ function PairInsights({ matrix, tickers }: { matrix: (number | null)[][]; ticker
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function CorrelationPage() {
+  const { plan, loading: subLoading } = useSubscription();
   const positions = usePortfolioStore((s) => s.positions);
   const { enrichedPositions } = usePortfolioValue();
 
@@ -262,6 +266,19 @@ export default function CorrelationPage() {
   }, [matrix, topTickers]);
 
   const cellSize = topTickers.length <= 6 ? 60 : topTickers.length <= 8 ? 52 : 44;
+
+  if (!subLoading && !isPaid(plan)) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Correlation Matrix" description="How your holdings move together — identifies concentration risk and natural hedges" />
+        <UpgradePrompt
+          title="Pro Feature: Correlation Matrix"
+          description="Visualize how your holdings move together, identify concentration risk, and spot natural hedges across your portfolio."
+          requiredPlan="pro"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

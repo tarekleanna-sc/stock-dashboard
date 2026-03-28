@@ -7,12 +7,16 @@ import { GlassButton } from '@/components/ui/GlassButton';
 import { GlassInput } from '@/components/ui/GlassInput';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { GlassBadge } from '@/components/ui/GlassBadge';
+import { UpgradePrompt } from '@/components/ui/UpgradePrompt';
 import { usePriceAlerts } from '@/hooks/usePriceAlerts';
 import { usePortfolioValue } from '@/hooks/usePortfolioValue';
+import { useSubscription } from '@/hooks/useSubscription';
+import { canUseAlerts } from '@/lib/utils/featureGating';
 import { formatCurrency } from '@/lib/utils/formatting';
 import type { AlertDirection } from '@/types/alerts';
 
 export default function AlertsPage() {
+  const { plan, loading: subLoading } = useSubscription();
   const { enrichedPositions } = usePortfolioValue();
   const { alerts, loading, newlyTriggered, addAlert, deleteAlert, dismissTriggered } =
     usePriceAlerts(enrichedPositions);
@@ -48,6 +52,19 @@ export default function AlertsPage() {
       setSubmitting(false);
     }
   };
+
+  if (!subLoading && !canUseAlerts(plan)) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Price Alerts" description="Get notified when a stock hits your target price" />
+        <UpgradePrompt
+          title="Pro Feature: Price Alerts"
+          description="Set custom price alerts for your holdings and get notified when targets are hit. Upgrade to Pro to unlock this feature."
+          requiredPlan="pro"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

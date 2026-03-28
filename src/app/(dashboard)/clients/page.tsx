@@ -7,8 +7,11 @@ import { GlassButton } from '@/components/ui/GlassButton';
 import { GlassInput } from '@/components/ui/GlassInput';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { GlassBadge } from '@/components/ui/GlassBadge';
+import { UpgradePrompt } from '@/components/ui/UpgradePrompt';
 import { useAdvisorClients } from '@/hooks/useAdvisorClients';
 import { useSelectedClient } from '@/providers/ClientProvider';
+import { useSubscription } from '@/hooks/useSubscription';
+import { canUseClients } from '@/lib/utils/featureGating';
 import type { AdvisorClient } from '@/types/advisor';
 
 interface ClientFormData {
@@ -21,6 +24,7 @@ interface ClientFormData {
 const EMPTY_FORM: ClientFormData = { name: '', email: '', phone: '', notes: '' };
 
 export default function ClientsPage() {
+  const { plan, loading: subLoading } = useSubscription();
   const { clients, loading, addClient, updateClient, deleteClient } = useAdvisorClients();
   const { selectedClient, setSelectedClient } = useSelectedClient();
 
@@ -85,6 +89,19 @@ export default function ClientsPage() {
     if (selectedClient?.id === id) setSelectedClient(null);
     setDeletingId(null);
   };
+
+  if (!subLoading && !canUseClients(plan)) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Clients" description="Advisor mode — manage multiple client portfolios" />
+        <UpgradePrompt
+          title="Advisor Feature: Multi-Client Mode"
+          description="Manage multiple client portfolios, generate branded PDF reports, and switch between client views. Upgrade to Advisor to unlock this feature."
+          requiredPlan="advisor"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

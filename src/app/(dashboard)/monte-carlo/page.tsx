@@ -6,9 +6,12 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import PageHeader from '@/components/layout/PageHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GlassBadge } from '@/components/ui/GlassBadge';
+import { UpgradePrompt } from '@/components/ui/UpgradePrompt';
 import { usePortfolioValue } from '@/hooks/usePortfolioValue';
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useRiskMetrics } from '@/hooks/useRiskMetrics';
+import { useSubscription } from '@/hooks/useSubscription';
+import { isPaid } from '@/lib/utils/featureGating';
 import { formatCurrency, formatPercent } from '@/lib/utils/formatting';
 
 // ─── Monte Carlo engine ───────────────────────────────────────────────────────
@@ -129,6 +132,7 @@ function ScenarioCard({ label, value, pct, variant, sub }: {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MonteCarloPage() {
+  const { plan, loading: subLoading } = useSubscription();
   const { enrichedPositions, totalValue, isLoading } = usePortfolioValue();
   const snapshots = usePortfolioStore((s) => s.snapshots);
   const riskMetrics = useRiskMetrics(enrichedPositions, snapshots);
@@ -193,6 +197,19 @@ export default function MonteCarloPage() {
     const cdf = (x: number) => 0.5 * (1 + erfApprox(x / Math.SQRT2) * Math.sign(x));
     return Math.round((1 - cdf(z)) * 100);
   }, [finalData, annualReturn, effectiveVolatility, years, totalValue]);
+
+  if (!subLoading && !isPaid(plan)) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Monte Carlo Simulation" description="Probabilistic portfolio projections based on expected returns and volatility" />
+        <UpgradePrompt
+          title="Pro Feature: Monte Carlo Simulation"
+          description="Run thousands of probabilistic projections for your portfolio based on expected returns and volatility, with 10th/50th/90th percentile outcomes."
+          requiredPlan="pro"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

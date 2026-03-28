@@ -4,6 +4,10 @@ import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePortfolioValue } from '@/hooks/usePortfolioValue';
 import { usePortfolioStore } from '@/stores/portfolioStore';
+import { useSubscription } from '@/hooks/useSubscription';
+import { isPaid } from '@/lib/utils/featureGating';
+import PageHeader from '@/components/layout/PageHeader';
+import { UpgradePrompt } from '@/components/ui/UpgradePrompt';
 import type { PositionWithMarketData } from '@/types/portfolio';
 
 // ─── Tax helpers ──────────────────────────────────────────────────────────────
@@ -129,6 +133,7 @@ const fmtK = (n: number) =>
     : fmt(n);
 
 export default function TaxLotsPage() {
+  const { plan, loading: subLoading } = useSubscription();
   const { positions: rawPositions } = usePortfolioValue();
   const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
   const [sellShares, setSellShares] = useState<Record<string, number>>({});
@@ -161,6 +166,19 @@ export default function TaxLotsPage() {
     const harvestOpportunity = Math.abs(ltLosses + stLosses); // potential tax loss harvest
     return { ltGains, stGains, ltLosses, stLosses, totalEstTax, harvestOpportunity };
   }, [lots]);
+
+  if (!subLoading && !isPaid(plan)) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Tax Lot Tracking" description="FIFO · LIFO · HIFO · Specific ID — tax-optimized lot selection" />
+        <UpgradePrompt
+          title="Pro Feature: Tax Lot Tracking"
+          description="Simulate sell orders with FIFO/LIFO/HIFO/Specific ID methods, classify long-term vs short-term gains, and identify tax-loss harvesting opportunities."
+          requiredPlan="pro"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

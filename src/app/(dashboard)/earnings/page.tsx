@@ -5,8 +5,11 @@ import { motion } from 'framer-motion';
 import PageHeader from '@/components/layout/PageHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GlassBadge } from '@/components/ui/GlassBadge';
+import { UpgradePrompt } from '@/components/ui/UpgradePrompt';
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useEarningsCalendar, groupByDate, EarningsEvent } from '@/hooks/useEarningsCalendar';
+import { useSubscription } from '@/hooks/useSubscription';
+import { isPaid } from '@/lib/utils/featureGating';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -258,6 +261,7 @@ function FilterTabs({ active, onChange }: { active: FilterMode; onChange: (m: Fi
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function EarningsPage() {
+  const { plan, loading: subLoading } = useSubscription();
   const positions = usePortfolioStore((s) => s.positions);
   const [filter, setFilter] = useState<FilterMode>('upcoming');
 
@@ -298,6 +302,19 @@ export default function EarningsPage() {
   const sortedDates = useMemo(() => Object.keys(grouped).sort(), [grouped]);
 
   const holdingCount = holdingEvents.filter((e) => holdingSet.has(e.symbol)).length;
+
+  if (!subLoading && !isPaid(plan)) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Earnings Calendar" description="Track upcoming earnings for your holdings and the broader market" />
+        <UpgradePrompt
+          title="Pro Feature: Earnings Calendar"
+          description="Track upcoming earnings dates for every holding in your portfolio, with EPS estimates and beat/miss history. Upgrade to Pro to unlock."
+          requiredPlan="pro"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { LogOut, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useSupabase } from '@/providers/SupabaseProvider';
+import { AdminPlanSwitcher } from '@/components/ui/AdminPlanSwitcher';
 
 const navItems = [
   {
@@ -214,6 +215,7 @@ export default function Sidebar({ userEmail }: { userEmail: string }) {
 
   async function handleSignOut() {
     await supabase.auth.signOut();
+    router.refresh();           // clear Next.js RSC cache so server components re-check auth
     router.push('/auth/login');
   }
 
@@ -296,6 +298,8 @@ export default function Sidebar({ userEmail }: { userEmail: string }) {
 
       {/* Bottom: user + sign out */}
       <div className="px-2 space-y-1">
+        {/* Admin plan switcher — only visible for admin account */}
+        <AdminPlanSwitcher expanded={expanded} />
         {/* Divider */}
         <div className="h-px bg-white/[0.06] mb-2 mx-1" />
 

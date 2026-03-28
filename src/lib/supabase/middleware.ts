@@ -32,8 +32,9 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Public routes accessible without auth
-  const publicRoutes = ['/', '/pricing', '/features']
+  // Public routes accessible without auth (/ is intentionally excluded — unauthenticated
+  // users are sent to /auth/login; authenticated users are sent to /dashboard)
+  const publicRoutes = ['/pricing', '/features']
   const isPublicRoute = publicRoutes.includes(pathname)
 
   // Unauthenticated user hitting a protected route → redirect to login
