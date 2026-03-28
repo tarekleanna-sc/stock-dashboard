@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
-import { useSubscription } from '@/hooks/useSubscription';
+import { useSubscription, ADMIN_PLAN_OVERRIDE_KEY } from '@/hooks/useSubscription';
 import type { PlanId } from '@/types/billing';
 
 const ADMIN_EMAIL = 'tarekleanna@gmail.com';
@@ -18,36 +18,19 @@ interface AdminPlanSwitcherProps {
 }
 
 export function AdminPlanSwitcher({ expanded }: AdminPlanSwitcherProps) {
-  const { supabase, user } = useSupabase();
+  const { user } = useSupabase();
   const { plan } = useSubscription();
-  const [loading, setLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
   // Only render for the admin user
   if (!user || user.email !== ADMIN_EMAIL) return null;
 
-  async function switchPlan(newPlan: PlanId) {
+  function switchPlan(newPlan: PlanId) {
     if (newPlan === plan) { setShowMenu(false); return; }
-    setLoading(true);
+    localStorage.setItem(ADMIN_PLAN_OVERRIDE_KEY, newPlan);
+    // Dispatch custom event so useSubscription in the same tab picks it up instantly
+    window.dispatchEvent(new Event('adminOverrideChanged'));
     setShowMenu(false);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const res = await fetch('/api/admin/set-plan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ plan: newPlan }),
-      });
-      if (!res.ok) {
-        const body = await res.json();
-        console.error('Plan switch failed:', body.error);
-      }
-    } finally {
-      setLoading(false);
-    }
   }
 
   const currentPlanMeta = PLANS.find(p => p.id === plan) ?? PLANS[0];
@@ -56,8 +39,7 @@ export function AdminPlanSwitcher({ expanded }: AdminPlanSwitcherProps) {
     <div className="relative px-2 mt-1">
       <button
         onClick={() => setShowMenu(v => !v)}
-        disabled={loading}
-        className={`group relative flex h-9 w-full items-center gap-2.5 rounded-xl px-2.5 border border-amber-500/30 bg-amber-500/[0.07] hover:bg-amber-500/[0.12] transition-all disabled:opacity-50 ${
+        className={`group relative flex h-9 w-full items-center gap-2.5 rounded-xl px-2.5 border border-amber-500/30 bg-amber-500/[0.07] hover:bg-amber-500/[0.12] transition-all ${
           expanded ? '' : 'justify-center'
         }`}
         title="Admin: Switch Plan"
@@ -79,11 +61,7 @@ export function AdminPlanSwitcher({ expanded }: AdminPlanSwitcherProps) {
 
         {expanded && (
           <span className="text-xs font-medium text-amber-400/80 whitespace-nowrap transition-all duration-200 opacity-100 truncate">
-            {loading ? 'Switching…' : (
-              <>
-                Admin · <span className={currentPlanMeta.color}>{currentPlanMeta.label}</span>
-              </>
-            )}
+            Admin · <span className={currentPlanMeta.color}>{currentPlanMeta.label}</span>
           </span>
         )}
 
@@ -115,6 +93,9 @@ export function AdminPlanSwitcher({ expanded }: AdminPlanSwitcherProps) {
               )}
             </button>
           ))}
+          <p className="px-3 py-2 text-[9px] text-amber-400/30 border-t border-white/[0.05]">
+            Local override — no API key needed
+          </p>
         </div>
       )}
     </div>

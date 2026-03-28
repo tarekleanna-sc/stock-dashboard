@@ -516,7 +516,12 @@ export default function OnboardingPage() {
   }
 
   async function handlePositionNext() {
-    if (!user || !createdAccountId) return;
+    if (!user) return;
+    // If account was skipped, no accountId exists — just mark complete and proceed
+    if (!createdAccountId) {
+      await skipToComplete();
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -541,7 +546,9 @@ export default function OnboardingPage() {
   }
 
   async function handleGoToDashboard() {
-    await markOnboardingComplete();
+    try {
+      await markOnboardingComplete();
+    } catch { /* non-blocking — always navigate */ }
     router.push('/dashboard');
   }
 
@@ -550,7 +557,9 @@ export default function OnboardingPage() {
   }
 
   async function skipToComplete() {
-    await markOnboardingComplete();
+    try {
+      await markOnboardingComplete();
+    } catch { /* non-blocking */ }
     setStep(3);
   }
 

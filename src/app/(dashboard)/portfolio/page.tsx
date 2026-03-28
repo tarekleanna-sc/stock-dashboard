@@ -54,6 +54,10 @@ export default function PortfolioPage() {
   const [isDeletePositionModalOpen, setIsDeletePositionModalOpen] = useState(false);
   const [isClosePositionModalOpen, setIsClosePositionModalOpen] = useState(false);
 
+  // Error states for modals
+  const [accountError, setAccountError] = useState('');
+  const [positionError, setPositionError] = useState('');
+
   // Editing states
   const [editingAccount, setEditingAccount] = useState<BrokerAccount | null>(null);
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
@@ -92,6 +96,7 @@ export default function PortfolioPage() {
   // Account CRUD handlers
   const handleOpenAddAccount = () => {
     setEditingAccount(null);
+    setAccountError('');
     accountForm.reset({ name: '', broker: undefined, accountType: undefined, cashBalance: 0 });
     setIsAccountModalOpen(true);
   };
@@ -109,14 +114,19 @@ export default function PortfolioPage() {
 
   const handleAccountSubmit = async (data: AccountFormData) => {
     if (!user) return;
-    if (editingAccount) {
-      await updateAccount(editingAccount.id, data, supabase);
-    } else {
-      await addAccount(data, supabase, user.id);
+    setAccountError('');
+    try {
+      if (editingAccount) {
+        await updateAccount(editingAccount.id, data, supabase);
+      } else {
+        await addAccount(data, supabase, user.id);
+      }
+      setIsAccountModalOpen(false);
+      setEditingAccount(null);
+      accountForm.reset();
+    } catch (e) {
+      setAccountError(e instanceof Error ? e.message : 'Failed to save account. Please try again.');
     }
-    setIsAccountModalOpen(false);
-    setEditingAccount(null);
-    accountForm.reset();
   };
 
   const handleOpenDeleteAccount = (account: BrokerAccount) => {
@@ -147,15 +157,17 @@ export default function PortfolioPage() {
 
   const handlePositionSubmit = async (data: PositionFormData) => {
     if (!user) return;
+    setPositionError('');
     try {
       if (editingPosition) {
         await updatePosition(editingPosition.id, data, supabase);
       } else {
         await addPosition(data, supabase, user.id);
       }
-    } finally {
       setIsPositionModalOpen(false);
       setEditingPosition(null);
+    } catch (e) {
+      setPositionError(e instanceof Error ? e.message : 'Failed to save position. Please try again.');
     }
   };
 
@@ -321,10 +333,14 @@ export default function PortfolioPage() {
         onClose={() => {
           setIsAccountModalOpen(false);
           setEditingAccount(null);
+          setAccountError('');
         }}
         title={editingAccount ? 'Edit Account' : 'Add Account'}
       >
         <form onSubmit={accountForm.handleSubmit(handleAccountSubmit)} className="space-y-4">
+          {accountError && (
+            <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-400">{accountError}</p>
+          )}
           <div>
             <label className="block text-sm font-medium text-white/70 mb-1">Account Name</label>
             <GlassInput
@@ -388,9 +404,13 @@ export default function PortfolioPage() {
         onClose={() => {
           setIsPositionModalOpen(false);
           setEditingPosition(null);
+          setPositionError('');
         }}
         title={editingPosition ? 'Edit Position' : 'Add Position'}
       >
+        {positionError && (
+          <p className="mb-3 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-400">{positionError}</p>
+        )}
         <PositionForm
           accountId={preselectedAccountId}
           position={editingPosition ?? undefined}

@@ -154,7 +154,7 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
       createdAt: new Date().toISOString(),
     };
     set((state) => ({ accounts: [...state.accounts, newAccount] }));
-    await supabase.from('accounts').insert({
+    const { error } = await supabase.from('accounts').insert({
       id,
       user_id: userId,
       name: data.name,
@@ -162,6 +162,11 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
       type: data.accountType,
       cash_balance: data.cashBalance ?? 0,
     });
+    if (error) {
+      // Rollback optimistic update
+      set((state) => ({ accounts: state.accounts.filter((a) => a.id !== id) }));
+      throw new Error(error.message);
+    }
     return id;
   },
 
@@ -198,7 +203,7 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
       notes: data.notes,
     };
     set((state) => ({ positions: [...state.positions, newPosition] }));
-    await supabase.from('positions').insert({
+    const { error } = await supabase.from('positions').insert({
       id,
       user_id: userId,
       account_id: data.accountId,
@@ -207,6 +212,11 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
       avg_cost: data.costBasisPerShare,
       notes: data.notes ?? null,
     });
+    if (error) {
+      // Rollback optimistic update
+      set((state) => ({ positions: state.positions.filter((p) => p.id !== id) }));
+      throw new Error(error.message);
+    }
   },
 
   updatePosition: async (id, updates, supabase) => {
