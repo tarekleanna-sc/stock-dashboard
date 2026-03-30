@@ -40,10 +40,18 @@ function LoginPageInner() {
           setLoading(false);
         } else if (data.session) {
           // Email confirmation is OFF — user is immediately signed in.
-          // onAuthStateChange in SupabaseProvider will handle the redirect.
-          // Keep loading=true so the button stays in "Creating account…" state during navigation.
+          // Use full page navigation so the server middleware sees the new auth cookies.
+          if (refCode && data.user) {
+            try {
+              await fetch('/api/referral/track', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: refCode }),
+              });
+            } catch { /* non-blocking */ }
+          }
           const onboardingComplete = data.user?.user_metadata?.onboarding_completed === true;
-          router.push(onboardingComplete ? '/dashboard' : '/onboarding');
+          window.location.href = onboardingComplete ? '/dashboard' : '/onboarding';
         } else {
           // Email confirmation is ON — ask user to check their inbox.
           if (refCode && data.user) {
@@ -65,11 +73,11 @@ function LoginPageInner() {
           setError(error.message);
           setLoading(false);
         } else {
-          // onAuthStateChange in SupabaseProvider handles routing (checks onboarding).
-          // Fallback push in case the event is slow.
-          // Keep loading=true so the button stays in "Signing in…" state during navigation.
+          // Use full page navigation so the server middleware sees the new auth cookies.
+          // router.push() does a soft navigation where the middleware may not have the
+          // session cookie yet, causing a silent redirect back to /auth/login.
           const onboardingComplete = data.user?.user_metadata?.onboarding_completed === true;
-          router.push(onboardingComplete ? '/dashboard' : '/onboarding');
+          window.location.href = onboardingComplete ? '/dashboard' : '/onboarding';
         }
       }
     } catch (err) {

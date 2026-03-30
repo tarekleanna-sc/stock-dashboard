@@ -558,8 +558,8 @@ export default function OnboardingPage() {
     try {
       await markOnboardingComplete();
     } catch { /* non-blocking — always navigate */ }
-    router.push('/dashboard');
-    // Keep navigating=true — page will unmount on navigation
+    // Full page navigation so server middleware sees the updated user metadata.
+    window.location.href = '/dashboard';
   }
 
   function skipToStep3() {

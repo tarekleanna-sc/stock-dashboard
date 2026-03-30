@@ -46,8 +46,9 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
           // for sign-in; this catches cases like email-confirmation auto-login.
           const isOnAuthPage = window.location.pathname.startsWith('/auth');
           if (isOnAuthPage) {
+            // Use full page navigation to guarantee server middleware sees the auth cookies.
             const onboardingComplete = currentUser.user_metadata?.onboarding_completed === true;
-            router.push(onboardingComplete ? '/dashboard' : '/onboarding');
+            window.location.href = onboardingComplete ? '/dashboard' : '/onboarding';
           } else {
             // Already inside the app — just refresh so server components see the new session.
             router.refresh();
@@ -55,8 +56,8 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
         }
         if (event === 'SIGNED_OUT') {
           reset();
-          router.refresh();           // clear RSC cache so server components re-check auth
-          router.push('/auth/login');
+          // Full navigation ensures server middleware clears auth state properly.
+          window.location.href = '/auth/login';
         }
       }
     );
