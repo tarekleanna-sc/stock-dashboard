@@ -37,9 +37,13 @@ function LoginPageInner() {
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) {
           setError(error.message);
+          setLoading(false);
         } else if (data.session) {
           // Email confirmation is OFF — user is immediately signed in.
           // onAuthStateChange in SupabaseProvider will handle the redirect.
+          // Keep loading=true so the button stays in "Creating account…" state during navigation.
+          const onboardingComplete = data.user?.user_metadata?.onboarding_completed === true;
+          router.push(onboardingComplete ? '/dashboard' : '/onboarding');
         } else {
           // Email confirmation is ON — ask user to check their inbox.
           if (refCode && data.user) {
@@ -53,21 +57,23 @@ function LoginPageInner() {
           }
           setSuccessMsg('Account created! Check your email for a confirmation link, then sign in.');
           setMode('signin');
+          setLoading(false);
         }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
           setError(error.message);
+          setLoading(false);
         } else {
           // onAuthStateChange in SupabaseProvider handles routing (checks onboarding).
           // Fallback push in case the event is slow.
+          // Keep loading=true so the button stays in "Signing in…" state during navigation.
           const onboardingComplete = data.user?.user_metadata?.onboarding_completed === true;
           router.push(onboardingComplete ? '/dashboard' : '/onboarding');
         }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
-    } finally {
       setLoading(false);
     }
   }

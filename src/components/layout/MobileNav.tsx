@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useSupabase } from '@/providers/SupabaseProvider';
 
 // Primary nav items shown in bottom bar (max 5 for usability)
@@ -78,13 +77,14 @@ const ALL_NAV = [
 
 export default function MobileNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const { supabase } = useSupabase();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   async function handleSignOut() {
+    setSigningOut(true);
+    // SupabaseProvider handles the redirect on SIGNED_OUT event
     await supabase.auth.signOut();
-    router.push('/auth/login');
   }
 
   return (
@@ -151,12 +151,13 @@ export default function MobileNav() {
             {/* Sign out */}
             <button
               onClick={handleSignOut}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.03] py-3 text-sm text-white/40 hover:text-rose-400 transition-colors"
+              disabled={signingOut}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.03] py-3 text-sm text-white/40 hover:text-rose-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={signingOut ? 'animate-spin' : ''}>
                 <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
               </svg>
-              Sign out
+              {signingOut ? 'Signing out…' : 'Sign out'}
             </button>
           </div>
         </>

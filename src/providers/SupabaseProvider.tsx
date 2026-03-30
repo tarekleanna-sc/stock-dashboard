@@ -55,6 +55,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
         }
         if (event === 'SIGNED_OUT') {
           reset();
+          router.refresh();           // clear RSC cache so server components re-check auth
           router.push('/auth/login');
         }
       }

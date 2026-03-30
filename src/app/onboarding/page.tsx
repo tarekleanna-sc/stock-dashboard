@@ -149,11 +149,12 @@ function StepWelcome({ onNext, role, setRole }: {
 
 // ─── Step 1: Add Account ──────────────────────────────────────────────────────
 
-function StepAddAccount({ onNext, onSkip, draft, setDraft }: {
+function StepAddAccount({ onNext, onSkip, draft, setDraft, saving }: {
   onNext: () => void;
   onSkip: () => void;
   draft: AccountDraft;
   setDraft: (d: AccountDraft) => void;
+  saving: boolean;
 }) {
   const brokerOptions = Object.entries(BROKER_LABELS) as [BrokerName, string][];
   const typeOptions = Object.entries(ACCOUNT_TYPE_LABELS) as [AccountType, string][];
@@ -230,16 +231,17 @@ function StepAddAccount({ onNext, onSkip, draft, setDraft }: {
       <div className="flex gap-3">
         <button
           onClick={onSkip}
-          className="flex-1 rounded-xl border border-white/[0.10] bg-transparent py-3 text-sm text-white/50 transition-all hover:bg-white/[0.05] hover:text-white"
+          disabled={saving}
+          className="flex-1 rounded-xl border border-white/[0.10] bg-transparent py-3 text-sm text-white/50 transition-all hover:bg-white/[0.05] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Skip for now
         </button>
         <button
           onClick={onNext}
-          disabled={!isValid}
+          disabled={!isValid || saving}
           className="flex-[2] rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white transition-all hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Create Account →
+          {saving ? 'Creating…' : 'Create Account →'}
         </button>
       </div>
     </div>
@@ -248,12 +250,13 @@ function StepAddAccount({ onNext, onSkip, draft, setDraft }: {
 
 // ─── Step 2: Add Position ─────────────────────────────────────────────────────
 
-function StepAddPosition({ onNext, onSkip, draft, setDraft, accountName }: {
+function StepAddPosition({ onNext, onSkip, draft, setDraft, accountName, saving }: {
   onNext: () => void;
   onSkip: () => void;
   draft: PositionDraft;
   setDraft: (d: PositionDraft) => void;
   accountName: string;
+  saving: boolean;
 }) {
   const isValid = draft.ticker.trim().length > 0 &&
     parseFloat(draft.shares) > 0 &&
@@ -346,16 +349,17 @@ function StepAddPosition({ onNext, onSkip, draft, setDraft, accountName }: {
       <div className="flex gap-3">
         <button
           onClick={onSkip}
-          className="flex-1 rounded-xl border border-white/[0.10] bg-transparent py-3 text-sm text-white/50 transition-all hover:bg-white/[0.05] hover:text-white"
+          disabled={saving}
+          className="flex-1 rounded-xl border border-white/[0.10] bg-transparent py-3 text-sm text-white/50 transition-all hover:bg-white/[0.05] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Skip for now
         </button>
         <button
           onClick={onNext}
-          disabled={!isValid}
+          disabled={!isValid || saving}
           className="flex-[2] rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white transition-all hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Add Position →
+          {saving ? 'Adding…' : 'Add Position →'}
         </button>
       </div>
     </div>
@@ -364,11 +368,12 @@ function StepAddPosition({ onNext, onSkip, draft, setDraft, accountName }: {
 
 // ─── Step 3: Done ─────────────────────────────────────────────────────────────
 
-function StepDone({ role, accountCreated, positionAdded, onGoToDashboard }: {
+function StepDone({ role, accountCreated, positionAdded, onGoToDashboard, navigating }: {
   role: UserRole | null;
   accountCreated: boolean;
   positionAdded: boolean;
   onGoToDashboard: () => void;
+  navigating: boolean;
 }) {
   const nextSteps = [
     { done: accountCreated, label: 'Add more brokerage accounts', link: '/portfolio' },
@@ -446,9 +451,10 @@ function StepDone({ role, accountCreated, positionAdded, onGoToDashboard }: {
 
       <button
         onClick={onGoToDashboard}
-        className="w-full rounded-xl bg-emerald-500 py-3.5 text-sm font-semibold text-white transition-all hover:bg-emerald-400"
+        disabled={navigating}
+        className="w-full rounded-xl bg-emerald-500 py-3.5 text-sm font-semibold text-white transition-all hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Go to Dashboard →
+        {navigating ? 'Loading dashboard…' : 'Go to Dashboard →'}
       </button>
     </div>
   );
@@ -545,11 +551,15 @@ export default function OnboardingPage() {
     }
   }
 
+  const [navigating, setNavigating] = useState(false);
+
   async function handleGoToDashboard() {
+    setNavigating(true);
     try {
       await markOnboardingComplete();
     } catch { /* non-blocking — always navigate */ }
     router.push('/dashboard');
+    // Keep navigating=true — page will unmount on navigation
   }
 
   function skipToStep3() {
@@ -629,10 +639,8 @@ export default function OnboardingPage() {
                     onSkip={skipToStep3}
                     draft={accountDraft}
                     setDraft={setAccountDraft}
+                    saving={saving}
                   />
-                  {saving && (
-                    <div className="mt-3 text-center text-xs text-white/40">Saving...</div>
-                  )}
                 </motion.div>
               )}
 
@@ -651,10 +659,8 @@ export default function OnboardingPage() {
                     draft={positionDraft}
                     setDraft={setPositionDraft}
                     accountName={accountDraft.name || 'your account'}
+                    saving={saving}
                   />
-                  {saving && (
-                    <div className="mt-3 text-center text-xs text-white/40">Saving...</div>
-                  )}
                 </motion.div>
               )}
 
@@ -672,6 +678,7 @@ export default function OnboardingPage() {
                     accountCreated={accountCreated}
                     positionAdded={positionAdded}
                     onGoToDashboard={handleGoToDashboard}
+                    navigating={navigating}
                   />
                 </motion.div>
               )}
@@ -684,9 +691,10 @@ export default function OnboardingPage() {
           <div className="mt-5 text-center">
             <button
               onClick={handleGoToDashboard}
-              className="text-xs text-white/30 transition-colors hover:text-white/55"
+              disabled={saving || navigating}
+              className="text-xs text-white/30 transition-colors hover:text-white/55 disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              Skip setup and go straight to dashboard →
+              {navigating ? 'Loading dashboard…' : 'Skip setup and go straight to dashboard →'}
             </button>
           </div>
         )}

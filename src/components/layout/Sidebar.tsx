@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { LogOut, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { AdminPlanSwitcher } from '@/components/ui/AdminPlanSwitcher';
@@ -208,15 +208,15 @@ const navItems = [
 
 export default function Sidebar({ userEmail }: { userEmail: string }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { supabase } = useSupabase();
   const initials = userEmail ? userEmail[0].toUpperCase() : '?';
   const [expanded, setExpanded] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   async function handleSignOut() {
+    setSigningOut(true);
+    // SupabaseProvider handles the redirect on SIGNED_OUT event
     await supabase.auth.signOut();
-    router.refresh();           // clear Next.js RSC cache so server components re-check auth
-    router.push('/auth/login');
   }
 
   return (
@@ -323,11 +323,12 @@ export default function Sidebar({ userEmail }: { userEmail: string }) {
         {/* Sign out */}
         <button
           onClick={handleSignOut}
-          className={`group relative flex h-9 w-full items-center gap-3 rounded-xl px-2.5 text-white/30 transition-all hover:bg-white/[0.06] hover:text-rose-400 ${
+          disabled={signingOut}
+          className={`group relative flex h-9 w-full items-center gap-3 rounded-xl px-2.5 text-white/30 transition-all hover:bg-white/[0.06] hover:text-rose-400 disabled:opacity-50 disabled:cursor-not-allowed ${
             expanded ? '' : 'justify-center'
           }`}
         >
-          <LogOut size={14} className="flex-shrink-0" />
+          <LogOut size={14} className={`flex-shrink-0 ${signingOut ? 'animate-spin' : ''}`} />
           <span
             className={`text-sm font-medium whitespace-nowrap transition-all duration-200 ${
               expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0 overflow-hidden'
