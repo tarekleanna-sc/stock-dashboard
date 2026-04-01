@@ -215,8 +215,12 @@ export default function Sidebar({ userEmail }: { userEmail: string }) {
 
   async function handleSignOut() {
     setSigningOut(true);
-    // SupabaseProvider handles the redirect on SIGNED_OUT event
-    await supabase.auth.signOut();
+    try {
+      // SupabaseProvider handles the redirect on SIGNED_OUT event
+      await supabase.auth.signOut();
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   return (
