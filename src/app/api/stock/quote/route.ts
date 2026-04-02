@@ -26,49 +26,45 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 1. Try Finnhub (60 req/min free, real-time US quotes)
-  try {
-    // allSettled so a missing key or single failure doesn't abort the batch
-    const settled = await Promise.allSettled(symbols.map(finnhubQuote));
-    const finnhubResults = settled.map((r) => (r.status === 'fulfilled' ? r.value : null));
-    const hits = finnhubResults.filter(Boolean);
+  let results: StockQuote[] = [];
 
-    if (hits.length === symbols.length) {
-      // All symbols resolved via Finnhub — return early, saves FMP quota
-      return NextResponse.json(hits, {
-        headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30' },
-      });
-    }
+  // ── 1. Finnhub (only if key is configured) ───────────────────────────────
+  const finnhubKey = process.env.FINNHUB_API_KEY;
+  if (finnhubKey) {
+    try {
+      const settled = await Promise.allSettled(symbols.map(finnhubQuote));
+      const hits = settled
+        .map((r) => (r.status === 'fulfilled' ? r.value : null))
+        .filter(Boolean) as StockQuote[];
 
-    // Partial Finnhub success — fill missing symbols via FMP
-    const missingSymbols = symbols.filter(
-      (sym) => !hits.find((h) => h?.symbol === sym)
-    );
-
-    let fmpFallback: StockQuote[] = [];
-    if (missingSymbols.length > 0) {
-      try {
-        fmpFallback = await fetchQuotes(missingSymbols);
-      } catch {
-        // FMP also failed — we'll just return what Finnhub gave us
+      if (hits.length === symbols.length) {
+        // Full hit — return immediately, saves FMP quota
+        return NextResponse.json(hits, {
+          headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30' },
+        });
       }
+      results = hits;
+    } catch {
+      // Finnhub unavailable — continue to FMP
     }
-
-    const merged = [
-      ...hits,
-      ...fmpFallback,
-    ].filter(Boolean);
-
-    return NextResponse.json(merged, {
-      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30' },
-    });
-  } catch {
-    // Finnhub unavailable — fall back entirely to FMP
   }
 
-  // 2. FMP fallback
-  const data = await fetchQuotes(symbols);
-  return NextResponse.json(data, {
-    headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=60' },
+  // ── 2. FMP stable endpoint for any symbols Finnhub missed (or all, if Finnhub not configured) ──
+  // fetchQuotes fetches each symbol individually, so partial failures don't drop the whole batch.
+  const resolvedSymbols = new Set(results.map((r) => r.symbol));
+  const missing = symbols.filter((s) => !resolvedSymbols.has(s));
+
+  if (missing.length > 0) {
+    try {
+      const fmpQuotes = await fetchQuotes(missing);
+      results = [...results, ...fmpQuotes];
+    } catch (err) {
+      console.error('[quote/route] FMP stable fetch failed:', err);
+    }
+  }
+
+  // ── 3. Return whatever we have; client handles empty array gracefully ─────
+  return NextResponse.json(results, {
+    headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30' },
   });
 }

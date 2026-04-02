@@ -171,6 +171,7 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
   },
 
   updateAccount: async (id, updates, supabase) => {
+    const prev = get().accounts.find((a) => a.id === id);
     set((state) => ({
       accounts: state.accounts.map((a) => (a.id === id ? { ...a, ...updates } : a)),
     }));
@@ -180,15 +181,30 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
     if (updates.accountType) dbUpdates.type = updates.accountType;
     if (updates.cashBalance !== undefined) dbUpdates.cash_balance = updates.cashBalance;
     dbUpdates.updated_at = new Date().toISOString();
-    await supabase.from('accounts').update(dbUpdates).eq('id', id);
+    const { error } = await supabase.from('accounts').update(dbUpdates).eq('id', id);
+    if (error) {
+      if (prev) set((state) => ({ accounts: state.accounts.map((a) => (a.id === id ? prev : a)) }));
+      throw new Error(error.message);
+    }
   },
 
   deleteAccount: async (id, supabase) => {
+    const prevAccount = get().accounts.find((a) => a.id === id);
+    const prevPositions = get().positions.filter((p) => p.accountId === id);
     set((state) => ({
       accounts: state.accounts.filter((a) => a.id !== id),
       positions: state.positions.filter((p) => p.accountId !== id),
     }));
-    await supabase.from('accounts').delete().eq('id', id);
+    const { error } = await supabase.from('accounts').delete().eq('id', id);
+    if (error) {
+      if (prevAccount) {
+        set((state) => ({
+          accounts: [...state.accounts, prevAccount],
+          positions: [...state.positions, ...prevPositions],
+        }));
+      }
+      throw new Error(error.message);
+    }
   },
 
   addPosition: async (data, supabase, userId) => {
@@ -220,6 +236,7 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
   },
 
   updatePosition: async (id, updates, supabase) => {
+    const prev = get().positions.find((p) => p.id === id);
     set((state) => ({
       positions: state.positions.map((p) => (p.id === id ? { ...p, ...updates } : p)),
     }));
@@ -228,12 +245,21 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
     if (updates.shares !== undefined) dbUpdates.shares = updates.shares;
     if (updates.costBasisPerShare !== undefined) dbUpdates.avg_cost = updates.costBasisPerShare;
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
-    await supabase.from('positions').update(dbUpdates).eq('id', id);
+    const { error } = await supabase.from('positions').update(dbUpdates).eq('id', id);
+    if (error) {
+      if (prev) set((state) => ({ positions: state.positions.map((p) => (p.id === id ? prev : p)) }));
+      throw new Error(error.message);
+    }
   },
 
   deletePosition: async (id, supabase) => {
+    const prev = get().positions.find((p) => p.id === id);
     set((state) => ({ positions: state.positions.filter((p) => p.id !== id) }));
-    await supabase.from('positions').delete().eq('id', id);
+    const { error } = await supabase.from('positions').delete().eq('id', id);
+    if (error) {
+      if (prev) set((state) => ({ positions: [...state.positions, prev] }));
+      throw new Error(error.message);
+    }
   },
 
   addToWatchlist: async (ticker, supabase, userId) => {
