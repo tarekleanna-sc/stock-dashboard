@@ -19,7 +19,7 @@ interface ReferralRow {
   created_at: string;
 }
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stock-dashboard-delta-seven.vercel.app';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? (typeof window !== 'undefined' ? window.location.origin : 'https://stockdash.app');
 
 const REWARDS = [
   { threshold: 1, label: '1 referral', reward: '1 month Pro free', icon: '🎁' },

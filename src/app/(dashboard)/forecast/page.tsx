@@ -56,7 +56,12 @@ export default function ForecastPage() {
       <div className="space-y-6">
         <PageHeader title="Forecast" description="Project your portfolio's future value" />
         <GlassCard className="p-12 text-center">
-          <div className="text-4xl mb-4">📈</div>
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-cyan-500/10 flex items-center justify-center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+              <polyline points="17 6 23 6 23 12" />
+            </svg>
+          </div>
           <h3 className="text-lg font-semibold text-white mb-2">No Positions Yet</h3>
           <p className="text-white/50">
             Add positions to your portfolio to start forecasting growth.

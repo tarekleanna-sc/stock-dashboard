@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 const SETTINGS_NAV = [
   {
@@ -26,6 +29,8 @@ const SETTINGS_NAV = [
 ];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
   return (
     <div className="flex gap-6 flex-col md:flex-row">
       {/* Settings sidebar */}
@@ -35,16 +40,25 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
             Settings
           </p>
           <nav className="space-y-0.5">
-            {SETTINGS_NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all"
-              >
-                <span className="flex-shrink-0 text-white/40">{item.icon}</span>
-                <span className="font-medium">{item.label}</span>
-              </Link>
-            ))}
+            {SETTINGS_NAV.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-all ${
+                    isActive
+                      ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                      : 'text-white/50 hover:text-white/80 hover:bg-white/[0.05] border border-transparent'
+                  }`}
+                >
+                  <span className={`flex-shrink-0 ${isActive ? 'text-cyan-400' : 'text-white/40'}`}>
+                    {item.icon}
+                  </span>
+                  <span className="font-medium">{item.label}</span>
+                </Link>
+              );
+            })}
           </nav>
         </div>
       </aside>

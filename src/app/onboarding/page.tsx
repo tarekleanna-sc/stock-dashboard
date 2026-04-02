@@ -379,7 +379,7 @@ function StepDone({ role, accountCreated, positionAdded, onGoToDashboard, naviga
     { done: accountCreated, label: 'Add more brokerage accounts', link: '/portfolio' },
     { done: positionAdded, label: 'Import positions via CSV', link: '/portfolio' },
     ...(role === 'advisor' ? [{ done: false, label: 'Add your first client', link: '/clients' }] : []),
-    { done: false, label: 'Set price alerts', link: '/alerts' },
+    { done: false, label: 'Run a forecast projection', link: '/forecast' },
     { done: false, label: 'Explore charts & analytics', link: '/charts' },
   ];
 

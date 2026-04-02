@@ -165,8 +165,35 @@ export default function DashboardPage() {
     );
   }
 
+  // Detect when API keys are missing: positions exist but ALL prices are $0 after loading
+  const pricesAreMissing =
+    !isLoading &&
+    positions.length > 0 &&
+    enrichedPositions.every((p) => (p.currentPrice ?? 0) === 0);
+
   return (
     <div>
+      {/* API key warning banner */}
+      {pricesAreMissing && (
+        <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3 flex items-start gap-3">
+          <svg className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-300">Market data unavailable — prices showing $0</p>
+            <p className="text-xs text-amber-400/70 mt-0.5">
+              P&amp;L and portfolio value cannot be calculated. Make sure <code className="bg-white/[0.06] px-1 rounded">FMP_API_KEY</code> is set in your hosting environment variables (Netlify → Site Settings → Environment Variables), then redeploy.
+            </p>
+          </div>
+          <button
+            onClick={() => refetch()}
+            className="flex-shrink-0 text-xs text-amber-400/70 hover:text-amber-300 transition-colors underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Page Header */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}

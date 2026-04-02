@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "deploy": "npm run build && npx netlify-cli deploy --prod",
+    "deploy:preview": "npm run build && npx netlify-cli deploy"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -26,6 +28,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@netlify/plugin-nextjs": "^5.15.9",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

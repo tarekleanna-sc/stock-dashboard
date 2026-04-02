@@ -40,15 +40,6 @@ const PRIMARY_NAV = [
     ),
   },
   {
-    name: 'News',
-    href: '/news',
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2" />
-      </svg>
-    ),
-  },
-  {
     name: 'More',
     href: '__more__',
     icon: (
@@ -61,7 +52,6 @@ const PRIMARY_NAV = [
 
 // All nav items for the "More" drawer
 const ALL_NAV = [
-  { name: 'Alerts', href: '/alerts' },
   { name: 'Earnings', href: '/earnings' },
   { name: 'Recommendations', href: '/recommendations' },
   { name: 'Rebalance', href: '/rebalance' },

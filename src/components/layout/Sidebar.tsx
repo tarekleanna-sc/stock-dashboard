@@ -128,16 +128,6 @@ const navItems = [
     ),
   },
   {
-    name: 'News',
-    href: '/news',
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2" />
-        <path d="M16 13h-4M16 17h-4M10 13h.01M10 17h.01" />
-      </svg>
-    ),
-  },
-  {
     name: 'Earnings',
     href: '/earnings',
     icon: (
@@ -147,16 +137,6 @@ const navItems = [
         <line x1="8" y1="2" x2="8" y2="6" />
         <line x1="3" y1="10" x2="21" y2="10" />
         <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Alerts',
-    href: '/alerts',
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
-        <path d="M13.73 21a2 2 0 01-3.46 0" />
       </svg>
     ),
   },
