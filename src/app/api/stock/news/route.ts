@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const FINNHUB_BASE = 'https://finnhub.io/api/v1';
+/**
+ * Stock news API route — uses FMP (Financial Modeling Prep) stable endpoint.
+ * Supports both ticker-specific and general market news.
+ */
+
+export interface FMPNewsArticle {
+  title: string;
+  text: string;
+  url: string;
+  image: string;
+  publishedDate: string;  // ISO datetime string
+  site: string;
+  symbol: string;
+}
 
 export interface NewsArticle {
   id: number;
@@ -10,60 +23,82 @@ export interface NewsArticle {
   source: string;
   url: string;
   image: string;
-  datetime: number; // Unix timestamp
+  datetime: number; // Unix timestamp (seconds)
   category: string;
   related: string;
+}
+
+function fmpToNews(article: FMPNewsArticle, idx: number, fallbackSymbol?: string): NewsArticle {
+  return {
+    id: idx,
+    symbol: (article.symbol || fallbackSymbol || '').toUpperCase(),
+    headline: article.title || '',
+    summary: article.text || '',
+    source: article.site || '',
+    url: article.url || '',
+    image: article.image || '',
+    datetime: article.publishedDate
+      ? Math.floor(new Date(article.publishedDate).getTime() / 1000)
+      : Math.floor(Date.now() / 1000),
+    category: '',
+    related: article.symbol || fallbackSymbol || '',
+  };
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const symbol = searchParams.get('symbol');
-  const fromParam = searchParams.get('from');
-  const toParam = searchParams.get('to');
+  const limitParam = searchParams.get('limit');
+  const limit = limitParam ? Math.min(parseInt(limitParam, 10), 50) : 20;
 
-  const apiKey = process.env.FINNHUB_API_KEY;
+  const apiKey = process.env.FMP_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: 'FINNHUB_API_KEY not configured' }, { status: 500 });
+    return NextResponse.json({ error: 'FMP_API_KEY not configured' }, { status: 500 });
   }
 
-  // Date range defaults: last 7 days
-  const toDate = toParam ?? new Date().toISOString().split('T')[0];
-  const fromDate = fromParam ?? (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString().split('T')[0];
-  })();
-
   try {
+    let articles: NewsArticle[] = [];
+
     if (symbol) {
-      // Company-specific news
-      const url = `${FINNHUB_BASE}/company-news?symbol=${encodeURIComponent(symbol)}&from=${fromDate}&to=${toDate}&token=${apiKey}`;
-      const res = await fetch(url, { next: { revalidate: 900 } }); // 15 min cache
+      // Fetch news for a specific ticker (or comma-separated list)
+      const symbols = symbol.split(',').map((s) => s.trim().toUpperCase()).join(',');
+      const url = `https://financialmodelingprep.com/stable/news/stock-news?tickers=${encodeURIComponent(symbols)}&limit=${limit}&apikey=${apiKey}`;
+      const res = await fetch(url, { next: { revalidate: 900 } });
+
       if (!res.ok) {
-        return NextResponse.json({ error: `Finnhub error: ${res.status}` }, { status: res.status });
+        const text = await res.text().catch(() => '');
+        console.error('[news route] FMP error:', res.status, text);
+        return NextResponse.json(
+          { error: `FMP error: ${res.status}` },
+          { status: res.status },
+        );
       }
-      const articles: NewsArticle[] = await res.json();
-      // Return max 20 articles, filter out empty headlines
-      const filtered = (Array.isArray(articles) ? articles : [])
-        .filter((a) => a.headline && a.url)
-        .slice(0, 20)
-        .map((a) => ({ ...a, symbol: symbol.toUpperCase() }));
-      return NextResponse.json(filtered, {
-        headers: { 'Cache-Control': 'public, s-maxage=900, stale-while-revalidate=300' },
-      });
+
+      const data: FMPNewsArticle[] = await res.json();
+      articles = (Array.isArray(data) ? data : [])
+        .filter((a) => a.title && a.url)
+        .map((a, i) => fmpToNews(a, i, symbol));
+    } else {
+      // General market news (no ticker filter)
+      const url = `https://financialmodelingprep.com/stable/news/stock-news?limit=${Math.min(limit, 30)}&apikey=${apiKey}`;
+      const res = await fetch(url, { next: { revalidate: 900 } });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.error('[news route] FMP error:', res.status, text);
+        return NextResponse.json(
+          { error: `FMP error: ${res.status}` },
+          { status: res.status },
+        );
+      }
+
+      const data: FMPNewsArticle[] = await res.json();
+      articles = (Array.isArray(data) ? data : [])
+        .filter((a) => a.title && a.url)
+        .map((a, i) => fmpToNews(a, i));
     }
 
-    // General market news (no symbol)
-    const url = `${FINNHUB_BASE}/news?category=general&token=${apiKey}`;
-    const res = await fetch(url, { next: { revalidate: 900 } });
-    if (!res.ok) {
-      return NextResponse.json({ error: `Finnhub error: ${res.status}` }, { status: res.status });
-    }
-    const articles: NewsArticle[] = await res.json();
-    const filtered = (Array.isArray(articles) ? articles : [])
-      .filter((a) => a.headline && a.url)
-      .slice(0, 30);
-    return NextResponse.json(filtered, {
+    return NextResponse.json(articles, {
       headers: { 'Cache-Control': 'public, s-maxage=900, stale-while-revalidate=300' },
     });
   } catch (err) {

@@ -59,6 +59,11 @@ export function canUseBrandedReports(plan: PlanId | null | undefined): boolean {
   return atLeast(plan, 'advisor');
 }
 
+/** News impact analysis — Pro+ */
+export function canUseNewsImpact(plan: PlanId | null | undefined): boolean {
+  return atLeast(plan, 'pro');
+}
+
 /** Convenience: is user on a paid plan (pro or advisor)? */
 export function isPaid(plan: PlanId | null | undefined): boolean {
   return atLeast(plan, 'pro');

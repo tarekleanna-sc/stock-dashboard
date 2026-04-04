@@ -53,6 +53,7 @@ const PRIMARY_NAV = [
 // All nav items for the "More" drawer
 const ALL_NAV = [
   { name: 'Earnings', href: '/earnings' },
+  { name: 'News Impact', href: '/news' },
   { name: 'Recommendations', href: '/recommendations' },
   { name: 'Rebalance', href: '/rebalance' },
   { name: 'Forecast', href: '/forecast' },
